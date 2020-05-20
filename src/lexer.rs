@@ -61,7 +61,10 @@ impl<'a> Lexer<'a> {
 
     fn lex_identifier(&mut self) -> Token {
         let start = self.pos;
-        unimplemented!()
+        let end = self.read_many(|b| b.is_ascii_alphanumeric() || b == b'_');
+        let identifier = from_utf8(&self.input[start..end]).unwrap().to_string();
+        self.pos = end;
+        Token::Identifier(identifier)
     }
 
     fn read_many(&self, satisfy: impl Fn(u8) -> bool) -> usize {
