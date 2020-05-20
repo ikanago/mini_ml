@@ -5,14 +5,14 @@ enum BinopKind {
 
 enum Expr {
     Var(String),
-    I64(i64),
+    U64(u64),
     Bool(bool),
     Binop(BinopKind, Box<Expr>, Box<Expr>),
     If(Box<Expr>, Box<Expr>, Box<Expr>),
 }
 
 enum Type {
-    I64,
+    U64,
     Bool,
     Var,
     Fun,
