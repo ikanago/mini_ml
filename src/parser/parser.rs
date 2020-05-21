@@ -1,5 +1,5 @@
-use crate::lexer::Token;
-use crate::syntax::{BinOpKind, Expr};
+use crate::lexer::lexer::Token;
+use crate::parser::syntax::{BinOpKind, Expr};
 
 #[derive(Debug)]
 pub enum ParseError {
