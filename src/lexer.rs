@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 use std::str::from_utf8;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Token {
-    Number(usize),
+    Number(u64),
     Identifier(String),
     True,
     False,
@@ -17,8 +17,8 @@ pub enum Token {
 
 fn reserve_keyword() -> HashMap<String, Token> {
     let mut keywords = HashMap::new();
-    keywords.insert("True".to_string(), Token::True);
-    keywords.insert("False".to_string(), Token::False);
+    keywords.insert("true".to_string(), Token::True);
+    keywords.insert("false".to_string(), Token::False);
     keywords.insert("if".to_string(), Token::If);
     keywords.insert("then".to_string(), Token::Then);
     keywords.insert("else".to_string(), Token::Else);
@@ -79,7 +79,7 @@ impl<'a> Lexer<'a> {
         let end = self.read_many(|b| b"0123456789".contains(&b));
         let num = from_utf8(&self.input[start..end])
             .unwrap()
-            .parse::<usize>()
+            .parse::<u64>()
             .unwrap();
         self.pos = end;
         Some(Token::Number(num))

@@ -1,13 +1,15 @@
-enum BinopKind {
+#[derive(Debug)]
+pub enum BinOpKind {
     Plus,
     Mult,
 }
 
-enum Expr {
+#[derive(Debug)]
+pub enum Expr {
     Var(String),
     U64(u64),
     Bool(bool),
-    Binop(BinopKind, Box<Expr>, Box<Expr>),
+    Binop(BinOpKind, Box<Expr>, Box<Expr>),
     If(Box<Expr>, Box<Expr>, Box<Expr>),
 }
 
