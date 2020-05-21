@@ -5,6 +5,8 @@ use std::str::from_utf8;
 pub enum Token {
     Number(usize),
     Identifier(String),
+    True,
+    False,
     Plus,
     Asterisk,
     If,
@@ -15,10 +17,11 @@ pub enum Token {
 
 fn reserve_keyword() -> HashMap<String, Token> {
     let mut keywords = HashMap::new();
+    keywords.insert("True".to_string(), Token::True);
+    keywords.insert("False".to_string(), Token::False);
     keywords.insert("if".to_string(), Token::If);
     keywords.insert("then".to_string(), Token::Then);
     keywords.insert("else".to_string(), Token::Else);
-    keywords.insert(";;".to_string(), Token::SemiColon);
     keywords
 }
 
@@ -50,40 +53,64 @@ impl<'a> Lexer<'a> {
                 b'*' => self.lex_asterisk(),
                 b'0'..=b'9' => self.lex_number(),
                 b'a'..=b'z' | b'A'..=b'Z' => self.lex_identifier(),
-                _ => unimplemented!()
+                b' ' => self.skip_spaces(),
+                b';' => self.lex_semicolon(),
+                _ => unimplemented!(),
             };
-            self.tokens.push(token);
+            if let Some(token) = token {
+                self.tokens.push(token);
+            }
         }
         Ok(&self.tokens)
     }
 
-    fn lex_plus(&mut self) -> Token {
+    fn lex_plus(&mut self) -> Option<Token> {
         self.pos += 1;
-        Token::Plus
+        Some(Token::Plus)
     }
 
-    fn lex_asterisk(&mut self) -> Token {
+    fn lex_asterisk(&mut self) -> Option<Token> {
         self.pos += 1;
-        Token::Asterisk
+        Some(Token::Asterisk)
     }
 
-    fn lex_number(&mut self) -> Token {
+    fn lex_number(&mut self) -> Option<Token> {
         let start = self.pos;
         let end = self.read_many(|b| b"0123456789".contains(&b));
-        let num = from_utf8(&self.input[start..end]).unwrap().parse::<usize>().unwrap();
+        let num = from_utf8(&self.input[start..end])
+            .unwrap()
+            .parse::<usize>()
+            .unwrap();
         self.pos = end;
-        Token::Number(num)
+        Some(Token::Number(num))
     }
 
-    fn lex_identifier(&mut self) -> Token {
+    fn lex_identifier(&mut self) -> Option<Token> {
         let start = self.pos;
         let end = self.read_many(|b| b.is_ascii_alphanumeric() || b == b'_');
         self.pos = end;
         let identifier = from_utf8(&self.input[start..end]).unwrap().to_string();
-        match self.keywords.get(&identifier) {
+        let token = match self.keywords.get(&identifier) {
             Some(keyword) => keyword.clone(),
             None => Token::Identifier(identifier),
+        };
+        Some(token)
+    }
+
+    fn skip_spaces(&mut self) -> Option<Token> {
+        let skipped_pos = self.read_many(|b| b == b' ');
+        self.pos = skipped_pos;
+        None
+    }
+
+    fn lex_semicolon(&mut self) -> Option<Token> {
+        if self.pos + 1 == self.input.len() {
+            return None;
+        } else if self.input[self.pos] != b';' {
+            return None;
         }
+        self.pos += 2;
+        Some(Token::SemiColon)
     }
 
     fn read_many(&self, satisfy: impl Fn(u8) -> bool) -> usize {
