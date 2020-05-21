@@ -8,11 +8,17 @@ pub enum Token {
     Plus,
     Asterisk,
     If,
+    Then,
+    Else,
+    SemiColon,
 }
 
 fn reserve_keyword() -> HashMap<String, Token> {
     let mut keywords = HashMap::new();
     keywords.insert("if".to_string(), Token::If);
+    keywords.insert("then".to_string(), Token::Then);
+    keywords.insert("else".to_string(), Token::Else);
+    keywords.insert(";;".to_string(), Token::SemiColon);
     keywords
 }
 
