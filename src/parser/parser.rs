@@ -111,6 +111,14 @@ impl<'a> Parser<'a> {
                 Token::Identifier(var) => Ok(Expr::Var(var)),
                 Token::True => Ok(Expr::Bool(true)),
                 Token::False => Ok(Expr::Bool(false)),
+                Token::LParen => {
+                    let node = self.parse_add()?;
+                    match self.next() {
+                        Some(Token::RParen) => Ok(node),
+                        Some(_) => Err(ParseError::UnexpectedToken),
+                        None => Err(ParseError::UnclosedParen),
+                    }
+                }
                 _ => unimplemented!(),
             })
     }

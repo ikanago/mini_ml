@@ -8,6 +8,8 @@ pub enum Token {
     False,
     Plus,
     Asterisk,
+    LParen,
+    RParen,
     If,
     Then,
     Else,

@@ -69,8 +69,8 @@ mod tests {
     use crate::parser::syntax::Expr;
     use std::collections::HashMap;
     #[test]
-    fn test_eval_calc() -> Result<(), TypeError> {
-        let mut lexer = Lexer::new("a + b * 4;;");
+    fn test_eval_if() -> Result<(), TypeError> {
+        let mut lexer = Lexer::new("if true then if false then 1 else (a + b) * 4 else 4;;");
         let tokens = lexer.lex().unwrap();
         let mut parser = Parser::new(tokens);
         let vec_ast = parser.parse().unwrap();
@@ -79,7 +79,7 @@ mod tests {
         environment.insert("b".to_string(), Expr::U64(3));
         let evaluator = Eval::new(environment);
         let result = evaluator.eval(&vec_ast)?;
-        assert_eq!(result, vec![Expr::U64(14)],);
+        assert_eq!(result, vec![Expr::U64(20)],);
         Ok(())
     }
 }

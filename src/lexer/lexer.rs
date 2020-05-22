@@ -37,6 +37,8 @@ impl<'a> Lexer<'a> {
                 b'*' => self.lex_asterisk(),
                 b'0'..=b'9' => self.lex_number(),
                 b'a'..=b'z' | b'A'..=b'Z' => self.lex_identifier(),
+                b'(' => self.lex_lparen(),
+                b')' => self.lex_rparen(),
                 b' ' => self.skip_spaces(),
                 b';' => self.lex_semicolon(),
                 _ => unimplemented!(),
@@ -81,6 +83,16 @@ impl<'a> Lexer<'a> {
         Some(token)
     }
 
+    fn lex_lparen(&mut self) -> Option<Token> {
+        self.pos += 1;
+        Some(Token::LParen)
+    }
+
+    fn lex_rparen(&mut self) -> Option<Token> {
+        self.pos += 1;
+        Some(Token::RParen)
+    }
+
     fn skip_spaces(&mut self) -> Option<Token> {
         let skipped_pos = self.read_many(|b| b == b' ');
         self.pos = skipped_pos;
@@ -112,7 +124,7 @@ mod tests {
     use crate::lexer::{LexError, Token};
     #[test]
     fn test_lex_if() -> Result<(), LexError> {
-        let mut lexer = Lexer::new("if true then if false then 1 else 2 else 4;;");
+        let mut lexer = Lexer::new("if true then if false then 1 else (a + b) * 4 else 4;;");
         let tokens = lexer.lex()?;
         assert_eq!(tokens,
             &vec![
@@ -124,7 +136,13 @@ mod tests {
                 Token::Then,
                 Token::Number(1),
                 Token::Else,
-                Token::Number(2),
+                Token::LParen,
+                Token::Identifier("a".to_string()),
+                Token::Plus,
+                Token::Identifier("b".to_string()),
+                Token::RParen,
+                Token::Asterisk,
+                Token::Number(4),
                 Token::Else,
                 Token::Number(4),
                 Token::SemiColon,

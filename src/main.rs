@@ -5,7 +5,7 @@ use mini_ml::parser::syntax::Expr;
 use mini_ml::eval::eval::Eval;
 
 fn main() {
-    let mut lexer = Lexer::new("a + b * 4;;");
+    let mut lexer = Lexer::new("if true then if false then 1 else (a + b) * 4 else 4;;");
     let tokens = lexer.lex().unwrap();
     let mut parser = Parser::new(tokens);
     let ast = parser.parse().unwrap();

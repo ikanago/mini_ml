@@ -5,4 +5,5 @@ pub mod syntax;
 pub enum ParseError {
     Eof,
     UnexpectedToken,
+    UnclosedParen,
 }
