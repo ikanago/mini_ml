@@ -1,6 +1,6 @@
 use crate::lexer::Token;
-use crate::parser::ParseError;
 use crate::parser::syntax::{BinOpKind, Expr};
+use crate::parser::ParseError;
 
 #[derive(Clone, Debug)]
 pub struct Parser<'a> {
@@ -58,16 +58,21 @@ impl<'a> Parser<'a> {
         Ok(asts)
     }
 
+    /// BNF:
+    /// EXPR ::= IF_EXPR | LET_EXPR | COMP
     fn parse_expr(&mut self) -> Result<Expr, ParseError> {
         match self.peek() {
             Some(&Token::If) => self.parse_if(),
+            Some(&Token::Let) => self.parse_let(),
             _ => self.parse_compare(),
         }
     }
 
+    /// BNF:
+    /// IF_EXPR ::= `if` COMP `then` EXPR `else` EXPR
     fn parse_if(&mut self) -> Result<Expr, ParseError> {
         self.expect_token(Token::If)?;
-        let condition = self.parse_expr()?;
+        let condition = self.parse_compare()?;
         self.expect_token(Token::Then)?;
         let then = self.parse_expr()?;
         self.expect_token(Token::Else)?;
@@ -75,6 +80,30 @@ impl<'a> Parser<'a> {
         Ok(Expr::If(Box::new(condition), Box::new(then), Box::new(els)))
     }
 
+    /// BNF:
+    /// LET_EXPR ::= `let` IDENT = `EXPR` IN `EXPR`
+    fn parse_let(&mut self) -> Result<Expr, ParseError> {
+        self.expect_token(Token::Let)?;
+        let bound_var_name = self
+            .next()
+            .ok_or(ParseError::Eof)
+            .and_then(|token| match token {
+                Token::Identifier(var) => Ok(var),
+                _ => return Err(ParseError::UnexpectedToken),
+            })?;
+        self.expect_token(Token::Equal)?;
+        let initilizer = self.parse_expr()?;
+        self.expect_token(Token::In)?;
+        let body = self.parse_expr()?;
+        Ok(Expr::Let(
+            bound_var_name,
+            Box::new(initilizer),
+            Box::new(body),
+        ))
+    }
+
+    /// BNF:
+    /// COMP ::= ADD ((`<` ADD) | (`>` ADD))?
     fn parse_compare(&mut self) -> Result<Expr, ParseError> {
         let lhs = self.parse_add()?;
         match self.peek() {
@@ -88,17 +117,19 @@ impl<'a> Parser<'a> {
                 let rhs = self.parse_add()?;
                 Ok(Expr::BinOp(BinOpKind::Gt, Box::new(lhs), Box::new(rhs)))
             }
-            _ => Ok(lhs)
+            _ => Ok(lhs),
         }
     }
 
+    /// BNF:
+    /// ADD ::= MUL (`+` MUL)?
     fn parse_add(&mut self) -> Result<Expr, ParseError> {
         let mut lhs = self.parse_mul()?;
         loop {
             if self.peek() == Some(&Token::Plus) {
                 self.next();
                 let rhs = self.parse_mul()?;
-                lhs = Expr::BinOp(BinOpKind::Plus, Box::new(lhs), Box::new(rhs));
+                lhs = Expr::BinOp(BinOpKind::Add, Box::new(lhs), Box::new(rhs));
             } else {
                 break;
             }
@@ -106,13 +137,15 @@ impl<'a> Parser<'a> {
         Ok(lhs)
     }
 
+    /// BNF:
+    /// MUL ::= PRIM (`*` PRIM)?
     fn parse_mul(&mut self) -> Result<Expr, ParseError> {
         let mut lhs = self.parse_primary()?;
         loop {
             if self.peek() == Some(&Token::Asterisk) {
                 self.next();
                 let rhs = self.parse_primary()?;
-                lhs = Expr::BinOp(BinOpKind::Mult, Box::new(lhs), Box::new(rhs));
+                lhs = Expr::BinOp(BinOpKind::Mul, Box::new(lhs), Box::new(rhs));
             } else {
                 break;
             }
@@ -120,6 +153,8 @@ impl<'a> Parser<'a> {
         Ok(lhs)
     }
 
+    /// BNF:
+    /// PRIM ::= U64 | IDENT | TRUE | FALSE | `(` COMP `)`
     fn parse_primary(&mut self) -> Result<Expr, ParseError> {
         self.next()
             .ok_or(ParseError::Eof)
@@ -129,7 +164,7 @@ impl<'a> Parser<'a> {
                 Token::True => Ok(Expr::Bool(true)),
                 Token::False => Ok(Expr::Bool(false)),
                 Token::LParen => {
-                    let node = self.parse_add()?;
+                    let node = self.parse_compare()?;
                     match self.next() {
                         Some(Token::RParen) => Ok(node),
                         Some(_) => Err(ParseError::UnexpectedToken),

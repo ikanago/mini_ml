@@ -6,6 +6,8 @@ fn reserve_keyword() -> HashMap<String, Token> {
     let mut keywords = HashMap::new();
     keywords.insert("true".to_string(), Token::True);
     keywords.insert("false".to_string(), Token::False);
+    keywords.insert("let".to_string(), Token::Let);
+    keywords.insert("in".to_string(), Token::In);
     keywords.insert("if".to_string(), Token::If);
     keywords.insert("then".to_string(), Token::Then);
     keywords.insert("else".to_string(), Token::Else);
@@ -41,6 +43,7 @@ impl<'a> Lexer<'a> {
                 b'a'..=b'z' | b'A'..=b'Z' => self.lex_identifier(),
                 b'(' => self.lex_lparen(),
                 b')' => self.lex_rparen(),
+                b'=' => self.lex_equal(),
                 b' ' => self.skip_spaces(),
                 b';' => self.lex_semicolon(),
                 _ => unimplemented!(),
@@ -105,6 +108,11 @@ impl<'a> Lexer<'a> {
         Some(Token::RParen)
     }
 
+    fn lex_equal(&mut self) -> Option<Token> {
+        self.pos += 1;
+        Some(Token::Equal)
+    }
+
     fn skip_spaces(&mut self) -> Option<Token> {
         let skipped_pos = self.read_many(|b| b == b' ');
         self.pos = skipped_pos;
@@ -138,7 +146,8 @@ mod tests {
     fn test_lex_if() -> Result<(), LexError> {
         let mut lexer = Lexer::new("if a < b then if a > b then 1 else (a + b) * 4 else 4;;");
         let tokens = lexer.lex()?;
-        assert_eq!(tokens,
+        assert_eq!(
+            tokens,
             &vec![
                 Token::If,
                 Token::Identifier("a".to_string()),
@@ -161,6 +170,27 @@ mod tests {
                 Token::Number(4),
                 Token::Else,
                 Token::Number(4),
+                Token::SemiColon,
+            ]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_lex_let() -> Result<(), LexError> {
+        let mut lexer = Lexer::new("let a = 3 in a + 2;;");
+        let tokens = lexer.lex()?;
+        assert_eq!(
+            tokens,
+            &vec![
+                Token::Let,
+                Token::Identifier("a".to_string()),
+                Token::Equal,
+                Token::Number(3),
+                Token::In,
+                Token::Identifier("a".to_string()),
+                Token::Plus,
+                Token::Number(2),
                 Token::SemiColon,
             ]
         );
