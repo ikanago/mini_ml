@@ -1,19 +1,6 @@
 use std::collections::HashMap;
 use std::str::from_utf8;
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum Token {
-    Number(u64),
-    Identifier(String),
-    True,
-    False,
-    Plus,
-    Asterisk,
-    If,
-    Then,
-    Else,
-    SemiColon,
-}
+use crate::lexer::{Token, LexError};
 
 fn reserve_keyword() -> HashMap<String, Token> {
     let mut keywords = HashMap::new();
@@ -24,9 +11,6 @@ fn reserve_keyword() -> HashMap<String, Token> {
     keywords.insert("else".to_string(), Token::Else);
     keywords
 }
-
-#[derive(Debug)]
-pub enum LexError {}
 
 #[derive(Debug)]
 pub struct Lexer<'a> {

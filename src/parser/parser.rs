@@ -1,11 +1,6 @@
-use crate::lexer::lexer::Token;
+use crate::lexer::Token;
+use crate::parser::ParseError;
 use crate::parser::syntax::{BinOpKind, Expr};
-
-#[derive(Debug)]
-pub enum ParseError {
-    Eof,
-    UnexpectedToken,
-}
 
 #[derive(Clone, Debug)]
 pub struct Parser<'a> {
