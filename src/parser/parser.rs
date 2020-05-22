@@ -95,7 +95,7 @@ impl<'a> Parser<'a> {
             if self.peek() == Some(&Token::Asterisk) {
                 self.next();
                 let rhs = self.parse_primary()?;
-                lhs = Expr::Binop(BinOpKind::Plus, Box::new(lhs), Box::new(rhs));
+                lhs = Expr::Binop(BinOpKind::Mult, Box::new(lhs), Box::new(rhs));
             } else {
                 break;
             }

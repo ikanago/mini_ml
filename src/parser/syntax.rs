@@ -1,10 +1,10 @@
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BinOpKind {
     Plus,
     Mult,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Expr {
     Var(String),
     U64(u64),

@@ -1,6 +1,6 @@
+use crate::lexer::{LexError, Token};
 use std::collections::HashMap;
 use std::str::from_utf8;
-use crate::lexer::{Token, LexError};
 
 fn reserve_keyword() -> HashMap<String, Token> {
     let mut keywords = HashMap::new();
@@ -103,5 +103,33 @@ impl<'a> Lexer<'a> {
             pos += 1;
         }
         pos
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::lexer::lexer::Lexer;
+    use crate::lexer::{LexError, Token};
+    #[test]
+    fn test_lex_if() -> Result<(), LexError> {
+        let mut lexer = Lexer::new("if true then if false then 1 else 2 else 4;;");
+        let tokens = lexer.lex()?;
+        assert_eq!(tokens,
+            &vec![
+                Token::If,
+                Token::True,
+                Token::Then,
+                Token::If,
+                Token::False,
+                Token::Then,
+                Token::Number(1),
+                Token::Else,
+                Token::Number(2),
+                Token::Else,
+                Token::Number(4),
+                Token::SemiColon,
+            ]
+        );
+        Ok(())
     }
 }
