@@ -73,32 +73,18 @@ mod tests {
     use crate::lexer::lexer::Lexer;
     use crate::parser::parser::Parser;
     use crate::parser::syntax::Expr;
-    use std::collections::HashMap;
-    #[test]
-    fn test_eval_if() -> Result<(), TypeError> {
-        let mut lexer = Lexer::new("if a < b then if a > b then 1 else (a + b) * 4 else 4;;");
-        let tokens = lexer.lex().unwrap();
-        let mut parser = Parser::new(tokens);
-        let vec_ast = parser.parse().unwrap();
-        let mut environment: HashMap<String, Expr> = HashMap::new();
-        environment.insert("a".to_string(), Expr::U64(2));
-        environment.insert("b".to_string(), Expr::U64(3));
-        let mut evaluator = Eval::new(environment);
-        let result = evaluator.eval(&vec_ast)?;
-        assert_eq!(result, vec![Expr::U64(20)],);
-        Ok(())
-    }
 
     #[test]
     fn test_eval_let() -> Result<(), TypeError> {
-        let mut lexer = Lexer::new("let a = 3 in a + 2;;");
+        let mut lexer = Lexer::new(
+            "let a = 2 in let b = 3 in if a < b then if a > b then 1 else (a + b) * 4 else 4;;",
+        );
         let tokens = lexer.lex().unwrap();
         let mut parser = Parser::new(tokens);
         let vec_ast = parser.parse().unwrap();
-        let environment: HashMap<String, Expr> = HashMap::new();
-        let mut evaluator = Eval::new(environment);
+        let mut evaluator = Eval::new();
         let result = evaluator.eval(&vec_ast)?;
-        assert_eq!(result, vec![Expr::U64(5)],);
+        assert_eq!(result, vec![Expr::U64(20)],);
         Ok(())
     }
 }
