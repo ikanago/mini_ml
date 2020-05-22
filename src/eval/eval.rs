@@ -28,7 +28,7 @@ impl Eval {
             },
             &Expr::U64(n) => Ok(Expr::U64(*n)),
             &Expr::Bool(b) => Ok(Expr::Bool(*b)),
-            &Expr::Binop(op, lhs, rhs) => {
+            &Expr::BinOp(op, lhs, rhs) => {
                 let lhs = self.eval_expression(lhs)?;
                 let rhs = self.eval_expression(rhs)?;
                 Eval::apply_operator(op.clone(), lhs, rhs)
@@ -49,11 +49,10 @@ impl Eval {
     fn apply_operator(op: BinOpKind, lhs: Expr, rhs: Expr) -> Result<Expr, TypeError> {
         match (op, lhs, rhs) {
             (BinOpKind::Plus, Expr::U64(n), Expr::U64(m)) => Ok(Expr::U64(n + m)),
-            (BinOpKind::Plus, _, _) => Err(TypeError::UnsupportedOperandType(
-                "Both arguments must be u64".to_string(),
-            )),
             (BinOpKind::Mult, Expr::U64(n), Expr::U64(m)) => Ok(Expr::U64(n * m)),
-            (BinOpKind::Mult, _, _) => Err(TypeError::UnsupportedOperandType(
+            (BinOpKind::Lt, Expr::U64(n), Expr::U64(m)) => Ok(Expr::Bool(n < m)),
+            (BinOpKind::Gt, Expr::U64(n), Expr::U64(m)) => Ok(Expr::Bool(n > m)),
+            _ => Err(TypeError::UnsupportedOperandType(
                 "Both arguments must be u64".to_string(),
             )),
         }
@@ -70,7 +69,7 @@ mod tests {
     use std::collections::HashMap;
     #[test]
     fn test_eval_if() -> Result<(), TypeError> {
-        let mut lexer = Lexer::new("if true then if false then 1 else (a + b) * 4 else 4;;");
+        let mut lexer = Lexer::new("if a < b then if a > b then 1 else (a + b) * 4 else 4;;");
         let tokens = lexer.lex().unwrap();
         let mut parser = Parser::new(tokens);
         let vec_ast = parser.parse().unwrap();

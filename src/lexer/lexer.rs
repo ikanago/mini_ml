@@ -35,6 +35,8 @@ impl<'a> Lexer<'a> {
             let token = match self.input[self.pos] {
                 b'+' => self.lex_plus(),
                 b'*' => self.lex_asterisk(),
+                b'<' => self.lex_lt(),
+                b'>' => self.lex_gt(),
                 b'0'..=b'9' => self.lex_number(),
                 b'a'..=b'z' | b'A'..=b'Z' => self.lex_identifier(),
                 b'(' => self.lex_lparen(),
@@ -58,6 +60,16 @@ impl<'a> Lexer<'a> {
     fn lex_asterisk(&mut self) -> Option<Token> {
         self.pos += 1;
         Some(Token::Asterisk)
+    }
+
+    fn lex_lt(&mut self) -> Option<Token> {
+        self.pos += 1;
+        Some(Token::Lt)
+    }
+
+    fn lex_gt(&mut self) -> Option<Token> {
+        self.pos += 1;
+        Some(Token::Gt)
     }
 
     fn lex_number(&mut self) -> Option<Token> {
@@ -124,15 +136,19 @@ mod tests {
     use crate::lexer::{LexError, Token};
     #[test]
     fn test_lex_if() -> Result<(), LexError> {
-        let mut lexer = Lexer::new("if true then if false then 1 else (a + b) * 4 else 4;;");
+        let mut lexer = Lexer::new("if a < b then if a > b then 1 else (a + b) * 4 else 4;;");
         let tokens = lexer.lex()?;
         assert_eq!(tokens,
             &vec![
                 Token::If,
-                Token::True,
+                Token::Identifier("a".to_string()),
+                Token::Lt,
+                Token::Identifier("b".to_string()),
                 Token::Then,
                 Token::If,
-                Token::False,
+                Token::Identifier("a".to_string()),
+                Token::Gt,
+                Token::Identifier("b".to_string()),
                 Token::Then,
                 Token::Number(1),
                 Token::Else,

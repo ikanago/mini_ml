@@ -2,6 +2,8 @@
 pub enum BinOpKind {
     Plus,
     Mult,
+    Lt,
+    Gt,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -9,7 +11,7 @@ pub enum Expr {
     Var(String),
     U64(u64),
     Bool(bool),
-    Binop(BinOpKind, Box<Expr>, Box<Expr>),
+    BinOp(BinOpKind, Box<Expr>, Box<Expr>),
     If(Box<Expr>, Box<Expr>, Box<Expr>),
 }
 

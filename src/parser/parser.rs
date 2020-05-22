@@ -61,7 +61,7 @@ impl<'a> Parser<'a> {
     fn parse_expr(&mut self) -> Result<Expr, ParseError> {
         match self.peek() {
             Some(&Token::If) => self.parse_if(),
-            _ => self.parse_add(),
+            _ => self.parse_compare(),
         }
     }
 
@@ -75,13 +75,30 @@ impl<'a> Parser<'a> {
         Ok(Expr::If(Box::new(condition), Box::new(then), Box::new(els)))
     }
 
+    fn parse_compare(&mut self) -> Result<Expr, ParseError> {
+        let lhs = self.parse_add()?;
+        match self.peek() {
+            Some(&Token::Lt) => {
+                self.next();
+                let rhs = self.parse_add()?;
+                Ok(Expr::BinOp(BinOpKind::Lt, Box::new(lhs), Box::new(rhs)))
+            }
+            Some(&Token::Gt) => {
+                self.next();
+                let rhs = self.parse_add()?;
+                Ok(Expr::BinOp(BinOpKind::Gt, Box::new(lhs), Box::new(rhs)))
+            }
+            _ => Ok(lhs)
+        }
+    }
+
     fn parse_add(&mut self) -> Result<Expr, ParseError> {
         let mut lhs = self.parse_mul()?;
         loop {
             if self.peek() == Some(&Token::Plus) {
                 self.next();
                 let rhs = self.parse_mul()?;
-                lhs = Expr::Binop(BinOpKind::Plus, Box::new(lhs), Box::new(rhs));
+                lhs = Expr::BinOp(BinOpKind::Plus, Box::new(lhs), Box::new(rhs));
             } else {
                 break;
             }
@@ -95,7 +112,7 @@ impl<'a> Parser<'a> {
             if self.peek() == Some(&Token::Asterisk) {
                 self.next();
                 let rhs = self.parse_primary()?;
-                lhs = Expr::Binop(BinOpKind::Mult, Box::new(lhs), Box::new(rhs));
+                lhs = Expr::BinOp(BinOpKind::Mult, Box::new(lhs), Box::new(rhs));
             } else {
                 break;
             }
