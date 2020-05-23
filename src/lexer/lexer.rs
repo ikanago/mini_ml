@@ -44,7 +44,7 @@ impl<'a> Lexer<'a> {
                 b'(' => self.lex_lparen(),
                 b')' => self.lex_rparen(),
                 b'=' => self.lex_equal(),
-                b' ' => self.skip_spaces(),
+                b' ' | b'\n' => self.skip_spaces(),
                 b';' => self.lex_semicolon(),
                 _ => unimplemented!(),
             };
@@ -114,7 +114,7 @@ impl<'a> Lexer<'a> {
     }
 
     fn skip_spaces(&mut self) -> Option<Token> {
-        let skipped_pos = self.read_many(|b| b == b' ');
+        let skipped_pos = self.read_many(|b| b == b' ' || b == b'\n');
         self.pos = skipped_pos;
         None
     }
@@ -171,7 +171,7 @@ mod tests {
                 Token::Else,
                 Token::Number(4),
                 Token::SemiColon,
-            ]
+            ],
         );
         Ok(())
     }
@@ -192,7 +192,7 @@ mod tests {
                 Token::Plus,
                 Token::Number(2),
                 Token::SemiColon,
-            ]
+            ],
         );
         Ok(())
     }

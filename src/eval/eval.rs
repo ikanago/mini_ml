@@ -70,20 +70,16 @@ impl Eval {
 mod tests {
     use crate::eval::eval::Eval;
     use crate::eval::TypeError;
+    use crate::interpret;
     use crate::lexer::lexer::Lexer;
     use crate::parser::parser::Parser;
     use crate::parser::syntax::Expr;
 
     #[test]
     fn test_eval_let() -> Result<(), TypeError> {
-        let mut lexer = Lexer::new(
-            "let a = 2 in let b = 3 in if a < b then if a > b then 1 else (a + b) * 4 else 4;;",
-        );
-        let tokens = lexer.lex().unwrap();
-        let mut parser = Parser::new(tokens);
-        let vec_ast = parser.parse().unwrap();
-        let mut evaluator = Eval::new();
-        let result = evaluator.eval(&vec_ast)?;
+        let source_code =
+            "let a = 2 in let b = 3 in if a < b then if a > b then 1 else (a + b) * 4 else 4;;";
+        let result = interpret!(source_code)?;
         assert_eq!(result, vec![Expr::U64(20)],);
         Ok(())
     }
