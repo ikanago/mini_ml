@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate clap;
 
-use mini_ml::eval::eval::Eval;
+use mini_ml::eval::eval::eval;
 use mini_ml::interpret;
 use mini_ml::lexer::lexer::Lexer;
 use mini_ml::parser::parser::Parser;

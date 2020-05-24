@@ -1,4 +1,13 @@
 pub mod eval;
+use crate::parser::syntax::Expr;
+use std::collections::HashMap;
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum ExprVal {
+    U64(u64),
+    Bool(bool),
+    ProcV(String, Expr, HashMap<String, ExprVal>)
+}
 
 #[derive(Debug)]
 pub enum TypeError {
