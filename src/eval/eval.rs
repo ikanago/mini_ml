@@ -2,7 +2,7 @@ use crate::eval::{EvalError, ExprVal};
 use crate::parser::syntax::{BinOpKind, Expr};
 use std::collections::HashMap;
 
-pub fn eval(vec_ast: &Vec<Expr>) -> Result<Vec<ExprVal>, EvalError> {
+pub fn eval(vec_ast: &[Expr]) -> Result<Vec<ExprVal>, EvalError> {
     let mut result = vec![];
     for ast in vec_ast.iter() {
         let mut environment: HashMap<String, ExprVal> = HashMap::new();
@@ -76,17 +76,14 @@ fn apply_operator(op: BinOpKind, lhs: ExprVal, rhs: ExprVal) -> Result<ExprVal, 
 
 #[cfg(test)]
 mod tests {
-    use crate::eval::eval::eval;
     use crate::eval::{EvalError, ExprVal};
     use crate::interpret;
-    use crate::lexer::lexer::Lexer;
-    use crate::parser::parser::Parser;
 
     #[test]
     fn test_eval_let() -> Result<(), EvalError> {
         let source_code =
             "let a = 2 in let b = 3 in if a < b then if a > b then 1 else (a + b) * 4 else 4;;";
-        let result = interpret!(source_code)?;
+        let result = interpret(source_code, false, false);
         assert_eq!(result, vec![ExprVal::U64(20)],);
         Ok(())
     }
@@ -94,15 +91,16 @@ mod tests {
     #[test]
     fn test_eval_fun() -> Result<(), EvalError> {
         let source_code = "let apply = fun f -> fun x -> fun y -> if x < y then f x + y else f x * y in apply (fun x -> x + 1) 5 3;;";
-        let result = interpret!(source_code)?;
+        let result = interpret(source_code, false, false);
         assert_eq!(result, vec![ExprVal::U64(18)],);
 
         let source_code = "let apply = fun f x y -> if x < y then f x + y else f x * y in apply (fun x -> x + 1) 5 3;;";
-        let result = interpret!(source_code)?;
+        let result = interpret(source_code, false, false);
         assert_eq!(result, vec![ExprVal::U64(18)],);
 
-        let source_code = "let apply f x y = if x < y then f x + y else f x * y in apply (fun x -> x + 1) 5 3;;";
-        let result = interpret!(source_code)?;
+        let source_code =
+            "let apply f x y = if x < y then f x + y else f x * y in apply (fun x -> x + 1) 5 3;;";
+        let result = interpret(source_code, false, false);
         assert_eq!(result, vec![ExprVal::U64(18)],);
         Ok(())
     }
