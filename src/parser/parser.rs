@@ -2,6 +2,12 @@ use crate::lexer::Token;
 use crate::parser::syntax::{BinOpKind, Expr};
 use crate::parser::ParseError;
 
+#[derive(Clone, Debug, PartialEq)]
+enum DefinedAt {
+    Let,
+    Fun,
+}
+
 #[derive(Clone, Debug)]
 pub struct Parser<'a> {
     tokens: &'a Vec<Token>,
@@ -37,8 +43,8 @@ impl<'a> Parser<'a> {
             if token == expected_token {
                 Ok(())
             } else {
-                println!("{:?}", token);
-                println!("{:?}", expected_token);
+                eprintln!("Actual:   {:?}", token);
+                eprintln!("Expected: {:?}", expected_token);
                 Err(ParseError::UnexpectedToken)
             }
         })
@@ -85,20 +91,22 @@ impl<'a> Parser<'a> {
     /// LET_EXPR ::= `let` IDENT = `EXPR` IN `EXPR`
     fn parse_let(&mut self) -> Result<Expr, ParseError> {
         self.expect_token(Token::Let)?;
-        let bound_var_name = self
-            .next()
-            .ok_or(ParseError::Eof)
-            .and_then(|token| match token {
-                Token::Identifier(var) => Ok(var),
-                _ => Err(ParseError::UnexpectedToken),
-            })?;
-        self.expect_token(Token::Equal)?;
-        let initilizer = self.parse_expr()?;
+        let bound_var_name = match self.next() {
+            Some(Token::Identifier(var)) => var,
+            Some(_) => return Err(ParseError::UnexpectedToken),
+            None => return Err(ParseError::Eof),
+        };
+        let initializer = if let Some(&Token::Identifier(_)) = self.peek() {
+            self.parse_multi_args_fun(DefinedAt::Let)?
+        } else {
+            self.expect_token(Token::Equal)?;
+            self.parse_expr()?
+        };
         self.expect_token(Token::In)?;
         let body = self.parse_expr()?;
         Ok(Expr::Let(
             bound_var_name,
-            Box::new(initilizer),
+            Box::new(initializer),
             Box::new(body),
         ))
     }
@@ -107,16 +115,32 @@ impl<'a> Parser<'a> {
     /// FUN_EXPR ::= `fun` IDENT `->` EXPR
     fn parse_fun(&mut self) -> Result<Expr, ParseError> {
         self.expect_token(Token::Fun)?;
-        let arg = self
-            .next()
-            .ok_or(ParseError::Eof)
-            .and_then(|token| match token {
-                Token::Identifier(var) => Ok(var),
-                _ => Err(ParseError::UnexpectedToken),
-            })?;
-        self.expect_token(Token::RArrow)?;
-        let body = self.parse_expr()?;
-        Ok(Expr::Fun(arg, Box::new(body)))
+        let arg = match self.next() {
+            Some(Token::Identifier(var)) => Ok(var),
+            Some(_) => Err(ParseError::UnexpectedToken),
+            None => Err(ParseError::Eof),
+        }?;
+        if let Some(&Token::Identifier(_)) = self.peek() {
+            let fun_inner = self.parse_multi_args_fun(DefinedAt::Fun)?;
+            Ok(Expr::Fun(arg, Box::new(fun_inner)))
+        } else {
+            self.expect_token(Token::RArrow)?;
+            let body = self.parse_expr()?;
+            Ok(Expr::Fun(arg, Box::new(body)))
+        }
+    }
+
+    fn parse_multi_args_fun(&mut self, defined_at: DefinedAt) -> Result<Expr, ParseError> {
+        match self.next() {
+            Some(Token::Identifier(var)) => Ok(Expr::Fun(
+                var,
+                Box::new(self.parse_multi_args_fun(defined_at)?),
+            )),
+            Some(Token::RArrow) if defined_at == DefinedAt::Fun => self.parse_expr(),
+            Some(Token::Equal) if defined_at == DefinedAt::Let => self.parse_expr(),
+            Some(_) => Err(ParseError::UnexpectedToken),
+            None => Err(ParseError::Eof),
+        }
     }
 
     /// BNF:
@@ -155,7 +179,7 @@ impl<'a> Parser<'a> {
     }
 
     /// BNF:
-    /// MUL ::= PRIM (`*` PRIM)?
+    /// MUL ::= FUNC_APPLY (`*` FUNC_APPLY)?
     fn parse_mul(&mut self) -> Result<Expr, ParseError> {
         let mut lhs = self.parse_fn_apply()?;
         loop {
@@ -170,12 +194,17 @@ impl<'a> Parser<'a> {
         Ok(lhs)
     }
 
+    /// BNF:
+    /// FUN_APLLY ::= PRIM PRIM?
     fn parse_fn_apply(&mut self) -> Result<Expr, ParseError> {
         let mut node = self.parse_primary()?;
         loop {
+            // Try to read as function application.
             match self.parse_primary() {
                 Ok(arg) => node = Expr::Apply(Box::new(node), Box::new(arg)),
                 Err(ParseError::NonTerminalSymbol) => {
+                    // If this is not function application, roll back token position
+                    // because next token is passed over.
                     self.pos -= 1;
                     break;
                 }

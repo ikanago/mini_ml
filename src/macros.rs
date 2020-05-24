@@ -4,13 +4,20 @@ macro_rules! interpret {
         let mut lexer = Lexer::new($code);
         let tokens = match lexer.lex() {
             Ok(tokens) => tokens,
-            Err(err) => panic!(err),
+            Err(err) => {
+                eprintln!("{:?}", err);
+                panic!()
+            },
         };
         let mut parser = Parser::new(tokens);
         let vec_ast = match parser.parse() {
             Ok(vec_ast) => vec_ast,
-            Err(err) => panic!(err),
+            Err(err) => {
+                eprintln!("{:?}", err);
+                panic!()
+            }
         };
+        // println!("{:?}", vec_ast);
         let result = eval(&vec_ast);
         result
     }};
