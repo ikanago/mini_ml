@@ -104,4 +104,13 @@ mod tests {
         assert_eq!(result, vec![ExprVal::U64(18)],);
         Ok(())
     }
+
+    #[test]
+    #[should_panic]
+    fn test_invalid_fun_definition() {
+        let source_code = "let f = fun x y = x + y in f 1 2;;";
+        interpret(source_code, false, false);
+        let source_code = "let f x y -> x + y in f 1 2;;";
+        interpret(source_code, false, false);
+    }
 }
