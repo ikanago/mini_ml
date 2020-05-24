@@ -196,7 +196,7 @@ impl<'a> Parser<'a> {
                 Token::True => Ok(Expr::Bool(true)),
                 Token::False => Ok(Expr::Bool(false)),
                 Token::LParen => {
-                    let node = self.parse_compare()?;
+                    let node = self.parse_expr()?;
                     match self.next() {
                         Some(Token::RParen) => Ok(node),
                         Some(_) => Err(ParseError::UnexpectedToken),

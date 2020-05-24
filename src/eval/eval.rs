@@ -1,4 +1,4 @@
-use crate::eval::{ExprVal, EvalError};
+use crate::eval::{EvalError, ExprVal};
 use crate::parser::syntax::{BinOpKind, Expr};
 use std::collections::HashMap;
 
@@ -77,7 +77,7 @@ fn apply_operator(op: BinOpKind, lhs: ExprVal, rhs: ExprVal) -> Result<ExprVal, 
 #[cfg(test)]
 mod tests {
     use crate::eval::eval::eval;
-    use crate::eval::{ExprVal, EvalError};
+    use crate::eval::{EvalError, ExprVal};
     use crate::interpret;
     use crate::lexer::lexer::Lexer;
     use crate::parser::parser::Parser;
@@ -93,10 +93,9 @@ mod tests {
 
     #[test]
     fn test_eval_fun() -> Result<(), EvalError> {
-        let source_code =
-            "let f = fun x -> fun y -> if x < y then 1 else 0 in f 1 2;;";
+        let source_code = "let apply = fun f -> fun x -> fun y -> if x < y then f x + y else f x * y in apply (fun x -> x + 1) 5 3;;";
         let result = interpret!(source_code)?;
-        assert_eq!(result, vec![ExprVal::U64(1)],);
+        assert_eq!(result, vec![ExprVal::U64(18)],);
         Ok(())
     }
 }

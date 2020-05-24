@@ -1,6 +1,8 @@
 let apply = 
   fun f ->
+  fun x ->
   fun y -> 
-    f y
-in let f = fun x -> x + 1 
-in apply f 5;;
+    if x < y 
+      then f x + y
+      else f x * y
+in apply (fun x -> x + 1) 5 3;;
