@@ -96,6 +96,14 @@ mod tests {
         let source_code = "let apply = fun f -> fun x -> fun y -> if x < y then f x + y else f x * y in apply (fun x -> x + 1) 5 3;;";
         let result = interpret!(source_code)?;
         assert_eq!(result, vec![ExprVal::U64(18)],);
+
+        let source_code = "let apply = fun f x y -> if x < y then f x + y else f x * y in apply (fun x -> x + 1) 5 3;;";
+        let result = interpret!(source_code)?;
+        assert_eq!(result, vec![ExprVal::U64(18)],);
+
+        let source_code = "let apply f x y = if x < y then f x + y else f x * y in apply (fun x -> x + 1) 5 3;;";
+        let result = interpret!(source_code)?;
+        assert_eq!(result, vec![ExprVal::U64(18)],);
         Ok(())
     }
 }

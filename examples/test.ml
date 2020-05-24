@@ -1,3 +1,1 @@
-let s x y z =
-  x z (y z) in
-s (fun x y -> x + y) (fun x -> x * 2) 3;;
+let f x x = x + 1 in f 3 3;;
