@@ -174,9 +174,7 @@ impl<'a> Parser<'a> {
         let mut node = self.parse_primary()?;
         loop {
             match self.parse_primary() {
-                Ok(arg) => {
-                    node = Expr::Apply(Box::new(node), Box::new(arg))
-                }
+                Ok(arg) => node = Expr::Apply(Box::new(node), Box::new(arg)),
                 Err(ParseError::NonTerminalSymbol) => {
                     self.pos -= 1;
                     break;

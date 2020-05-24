@@ -11,7 +11,6 @@ macro_rules! interpret {
             Ok(vec_ast) => vec_ast,
             Err(err) => panic!(err),
         };
-        println!("{:#?}", vec_ast);
         let result = eval(&vec_ast);
         result
     }};

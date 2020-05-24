@@ -6,11 +6,11 @@ use std::collections::HashMap;
 pub enum ExprVal {
     U64(u64),
     Bool(bool),
-    ProcV(String, Expr, HashMap<String, ExprVal>)
+    ProcV(String, Box<Expr>, HashMap<String, ExprVal>),
 }
 
 #[derive(Debug)]
-pub enum TypeError {
+pub enum EvalError {
     NotBound(String),
     UnexpectedType(String),
     UnsupportedOperandType(String),

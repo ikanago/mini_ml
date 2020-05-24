@@ -214,4 +214,33 @@ mod tests {
         );
         Ok(())
     }
+
+    #[test]
+    fn test_lex_fun() -> Result<(), LexError> {
+        let mut lexer = Lexer::new("let f = fun x -> fun y -> x + y in f 2 3;;");
+        let tokens = lexer.lex()?;
+        assert_eq!(
+            tokens,
+            &vec![
+                Token::Let,
+                Token::Identifier("f".to_string()),
+                Token::Equal,
+                Token::Fun,
+                Token::Identifier("x".to_string()),
+                Token::RArrow,
+                Token::Fun,
+                Token::Identifier("y".to_string()),
+                Token::RArrow,
+                Token::Identifier("x".to_string()),
+                Token::Plus,
+                Token::Identifier("y".to_string()),
+                Token::In,
+                Token::Identifier("f".to_string()),
+                Token::Number(2),
+                Token::Number(3),
+                Token::SemiColon,
+            ],
+        );
+        Ok(())
+    }
 }

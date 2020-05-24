@@ -1,1 +1,6 @@
-let f = fun x -> fun y -> x + y in f 2 3;;
+let apply = 
+  fun f ->
+  fun y -> 
+    f y
+in let f = fun x -> x + 1 
+in apply f 5;;
