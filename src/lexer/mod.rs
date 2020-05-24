@@ -18,6 +18,8 @@ pub enum Token {
     If,
     Then,
     Else,
+    Fun,
+    RArrow,
     SemiColon,
 }
 

@@ -11,6 +11,7 @@ fn reserve_keyword() -> HashMap<String, Token> {
     keywords.insert("if".to_string(), Token::If);
     keywords.insert("then".to_string(), Token::Then);
     keywords.insert("else".to_string(), Token::Else);
+    keywords.insert("fun".to_string(), Token::Fun);
     keywords
 }
 
@@ -36,6 +37,13 @@ impl<'a> Lexer<'a> {
         while self.pos < self.input.len() {
             let token = match self.input[self.pos] {
                 b'+' => self.lex_plus(),
+                b'-' => {
+                    if self.pos != self.input.len() - 1 && self.input[self.pos + 1] == b'>' {
+                        self.lex_rarrow()
+                    } else {
+                        self.lex_minus()
+                    }
+                }
                 b'*' => self.lex_asterisk(),
                 b'<' => self.lex_lt(),
                 b'>' => self.lex_gt(),
@@ -58,6 +66,16 @@ impl<'a> Lexer<'a> {
     fn lex_plus(&mut self) -> Option<Token> {
         self.pos += 1;
         Some(Token::Plus)
+    }
+
+    fn lex_rarrow(&mut self) -> Option<Token> {
+        self.pos += 2;
+        Some(Token::RArrow)
+    }
+
+    fn lex_minus(&mut self) -> Option<Token> {
+        self.pos += 2;
+        None
     }
 
     fn lex_asterisk(&mut self) -> Option<Token> {

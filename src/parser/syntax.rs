@@ -14,6 +14,8 @@ pub enum Expr {
     BinOp(BinOpKind, Box<Expr>, Box<Expr>),
     Let(String, Box<Expr>, Box<Expr>),
     If(Box<Expr>, Box<Expr>, Box<Expr>),
+    Fun(String, Box<Expr>),
+    Apply(Box<Expr>, Box<Expr>),
 }
 
 // enum Type {

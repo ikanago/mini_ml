@@ -11,6 +11,7 @@ macro_rules! interpret {
             Ok(vec_ast) => vec_ast,
             Err(err) => panic!(err),
         };
+        println!("{:#?}", vec_ast);
         let mut evaluator = Eval::new();
         let result = evaluator.eval(&vec_ast);
         result

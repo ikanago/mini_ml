@@ -50,6 +50,8 @@ impl Eval {
                     )),
                 }
             }
+            &Expr::Fun(_, _) => unimplemented!(),
+            &Expr::Apply(_, _) => unimplemented!()
         }
     }
 
