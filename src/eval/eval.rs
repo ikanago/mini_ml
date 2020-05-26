@@ -65,6 +65,7 @@ fn eval_expression(
 fn apply_operator(op: BinOpKind, lhs: ExprVal, rhs: ExprVal) -> Result<ExprVal, EvalError> {
     match (op, lhs, rhs) {
         (BinOpKind::Add, ExprVal::U64(n), ExprVal::U64(m)) => Ok(ExprVal::U64(n + m)),
+        (BinOpKind::Sub, ExprVal::U64(n), ExprVal::U64(m)) => Ok(ExprVal::U64(n - m)),
         (BinOpKind::Mul, ExprVal::U64(n), ExprVal::U64(m)) => Ok(ExprVal::U64(n * m)),
         (BinOpKind::Lt, ExprVal::U64(n), ExprVal::U64(m)) => Ok(ExprVal::Bool(n < m)),
         (BinOpKind::Gt, ExprVal::U64(n), ExprVal::U64(m)) => Ok(ExprVal::Bool(n > m)),
@@ -82,9 +83,9 @@ mod tests {
     #[test]
     fn test_eval_let() -> Result<(), EvalError> {
         let source_code =
-            "let a = 2 in let b = 3 in if a < b then if a > b then 1 else (a + b) * 4 else 4;;";
+            "let a = 2 in let b = 4 in if a < b then if a > b then 1 else (b - a) * 4 else 4;;";
         let result = interpret(source_code, false, false);
-        assert_eq!(result, vec![ExprVal::U64(20)],);
+        assert_eq!(result, vec![ExprVal::U64(8)],);
         Ok(())
     }
 

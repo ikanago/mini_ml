@@ -7,6 +7,7 @@ pub enum Token {
     True,
     False,
     Plus,
+    Minus,
     Asterisk,
     Lt,
     Gt,

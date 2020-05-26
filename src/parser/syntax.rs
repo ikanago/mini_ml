@@ -1,6 +1,7 @@
 #[derive(Clone, Debug, PartialEq)]
 pub enum BinOpKind {
     Add,
+    Sub,
     Mul,
     Lt,
     Gt,

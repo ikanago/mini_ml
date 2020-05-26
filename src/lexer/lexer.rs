@@ -74,8 +74,8 @@ impl<'a> Lexer<'a> {
     }
 
     fn lex_minus(&mut self) -> Option<Token> {
-        self.pos += 2;
-        None
+        self.pos += 1;
+        Some(Token::Minus)
     }
 
     fn lex_asterisk(&mut self) -> Option<Token> {
@@ -162,7 +162,7 @@ mod tests {
     use crate::lexer::{LexError, Token};
     #[test]
     fn test_lex_if() -> Result<(), LexError> {
-        let mut lexer = Lexer::new("if a < b then if a > b then 1 else (a + b) * 4 else 4;;");
+        let mut lexer = Lexer::new("if a < b then if a > b then 1 else (b - a) * 4 else 4;;");
         let tokens = lexer.lex()?;
         assert_eq!(
             tokens,
@@ -180,9 +180,9 @@ mod tests {
                 Token::Number(1),
                 Token::Else,
                 Token::LParen,
-                Token::Identifier("a".to_string()),
-                Token::Plus,
                 Token::Identifier("b".to_string()),
+                Token::Minus,
+                Token::Identifier("a".to_string()),
                 Token::RParen,
                 Token::Asterisk,
                 Token::Number(4),

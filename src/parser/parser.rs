@@ -2,6 +2,7 @@ use crate::lexer::Token;
 use crate::parser::syntax::{BinOpKind, Expr};
 use crate::parser::ParseError;
 
+///Specify caller of `Parser::parse_multi_args_fun`.
 #[derive(Clone, Debug, PartialEq)]
 enum DefinedAt {
     Let,
@@ -88,7 +89,8 @@ impl<'a> Parser<'a> {
     }
 
     /// BNF:
-    /// LET_EXPR ::= `let` IDENT = `EXPR` IN `EXPR`
+    /// LET_EXPR ::= `let` IDENT = EXPR IN EXPR
+    ///            | `let` IDENT IDENT* = EXPR IN EXPR
     fn parse_let(&mut self) -> Result<Expr, ParseError> {
         self.expect_token(Token::Let)?;
         let bound_var_name = match self.next() {
@@ -97,8 +99,10 @@ impl<'a> Parser<'a> {
             None => return Err(ParseError::Eof),
         };
         let initializer = if let Some(&Token::Identifier(_)) = self.peek() {
+            // function
             self.parse_multi_args_fun(DefinedAt::Let)?
         } else {
+            // value
             self.expect_token(Token::Equal)?;
             self.parse_expr()?
         };
@@ -113,14 +117,17 @@ impl<'a> Parser<'a> {
 
     /// BNF:
     /// FUN_EXPR ::= `fun` IDENT `->` EXPR
+    ///            | `fun` IDENT* `->` EXPR
     fn parse_fun(&mut self) -> Result<Expr, ParseError> {
         self.expect_token(Token::Fun)?;
+        // First argument (required)
         let arg = match self.next() {
             Some(Token::Identifier(var)) => Ok(var),
             Some(_) => Err(ParseError::UnexpectedToken),
             None => Err(ParseError::Eof),
         }?;
         if let Some(&Token::Identifier(_)) = self.peek() {
+            // other arguments (optional)
             let fun_inner = self.parse_multi_args_fun(DefinedAt::Fun)?;
             Ok(Expr::Fun(arg, Box::new(fun_inner)))
         } else {
@@ -130,6 +137,8 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// Parse functions with multiple arguments
+    /// such as `let f x y = ...` or `let f = fun x y -> ...`.
     fn parse_multi_args_fun(&mut self, defined_at: DefinedAt) -> Result<Expr, ParseError> {
         match self.next() {
             Some(Token::Identifier(var)) => Ok(Expr::Fun(
@@ -171,6 +180,10 @@ impl<'a> Parser<'a> {
                 self.next();
                 let rhs = self.parse_mul()?;
                 lhs = Expr::BinOp(BinOpKind::Add, Box::new(lhs), Box::new(rhs));
+            } else if self.peek() == Some(&Token::Minus) {
+                self.next();
+                let rhs = self.parse_mul()?;
+                lhs = Expr::BinOp(BinOpKind::Sub, Box::new(lhs), Box::new(rhs))
             } else {
                 break;
             }
