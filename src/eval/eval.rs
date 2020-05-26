@@ -1,21 +1,18 @@
-use crate::eval::{EvalError, ExprVal};
+use crate::eval::{Env, EvalError, ExprVal};
 use crate::parser::syntax::{BinOpKind, Expr};
 use std::collections::HashMap;
 
 pub fn eval(vec_ast: &[Expr]) -> Result<Vec<ExprVal>, EvalError> {
     let mut result = vec![];
     for ast in vec_ast.iter() {
-        let mut environment: HashMap<String, ExprVal> = HashMap::new();
+        let mut environment: Env = HashMap::new();
         let expr = eval_expression(&ast, &mut environment)?;
         result.push(expr);
     }
     Ok(result)
 }
 
-fn eval_expression(
-    ast: &Expr,
-    environment: &mut HashMap<String, ExprVal>,
-) -> Result<ExprVal, EvalError> {
+fn eval_expression(ast: &Expr, environment: &mut Env) -> Result<ExprVal, EvalError> {
     match &ast {
         &Expr::Var(var) => match environment.get(var) {
             Some(expr) => Ok(expr.clone()),
@@ -33,6 +30,17 @@ fn eval_expression(
             environment.insert(var.clone(), init);
             eval_expression(body, environment)
         }
+        &Expr::LetRec(var, init, body) => {
+            let init = match eval_expression(init, environment) {
+                Ok(ExprVal::Closure(arg, body, env)) => {
+                    ExprVal::ClosureRec(var.clone(), arg, body, env)
+                }
+                Ok(init) => init,
+                Err(err) => return Err(err),
+            };
+            environment.insert(var.clone(), init);
+            eval_expression(body, environment)
+        }
         &Expr::If(condition, then, els) => {
             let condition = eval_expression(condition, environment)?;
             match condition {
@@ -43,7 +51,7 @@ fn eval_expression(
                 )),
             }
         }
-        &Expr::Fun(arg, body) => Ok(ExprVal::ProcV(
+        &Expr::Fun(arg, body) => Ok(ExprVal::Closure(
             arg.clone(),
             body.clone(),
             environment.clone(),
@@ -51,8 +59,13 @@ fn eval_expression(
         &Expr::Apply(fun, arg) => {
             let fun = eval_expression(fun, environment)?;
             let arg = eval_expression(arg, environment)?;
-            match fun {
-                ExprVal::ProcV(arg_name, body, mut captured_env) => {
+            match fun.clone() {
+                ExprVal::Closure(arg_name, body, mut captured_env) => {
+                    captured_env.insert(arg_name, arg);
+                    eval_expression(&body, &mut captured_env)
+                }
+                ExprVal::ClosureRec(closure_name, arg_name, body, mut captured_env) => {
+                    captured_env.insert(closure_name, fun);
                     captured_env.insert(arg_name, arg);
                     eval_expression(&body, &mut captured_env)
                 }
@@ -90,7 +103,7 @@ mod tests {
     }
 
     #[test]
-    fn test_eval_fun() -> Result<(), EvalError> {
+    fn test_eval_fun() {
         let source_code = "let apply = fun f -> fun x -> fun y -> if x < y then f x + y else f x * y in apply (fun x -> x + 1) 5 3;;";
         let result = interpret(source_code, false, false);
         assert_eq!(result, vec![ExprVal::U64(18)],);
@@ -103,7 +116,13 @@ mod tests {
             "let apply f x y = if x < y then f x + y else f x * y in apply (fun x -> x + 1) 5 3;;";
         let result = interpret(source_code, false, false);
         assert_eq!(result, vec![ExprVal::U64(18)],);
-        Ok(())
+    }
+
+    #[test]
+    fn test_eval_rec_fun() {
+        let source_code = "let rec fact x = if x > 0 then x * fact (x - 1) else 1 in fact 5;;";
+        let result = interpret(source_code, false, false);
+        assert_eq!(result, vec![ExprVal::U64(120)],);
     }
 
     #[test]

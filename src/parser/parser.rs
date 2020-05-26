@@ -93,6 +93,10 @@ impl<'a> Parser<'a> {
     ///            | `let` IDENT IDENT* = EXPR IN EXPR
     fn parse_let(&mut self) -> Result<Expr, ParseError> {
         self.expect_token(Token::Let)?;
+        let is_recursive = self.peek() == Some(&Token::Rec);
+        if is_recursive {
+            self.next();
+        }
         let bound_var_name = match self.next() {
             Some(Token::Identifier(var)) => var,
             Some(_) => return Err(ParseError::UnexpectedToken),
@@ -108,11 +112,20 @@ impl<'a> Parser<'a> {
         };
         self.expect_token(Token::In)?;
         let body = self.parse_expr()?;
-        Ok(Expr::Let(
-            bound_var_name,
-            Box::new(initializer),
-            Box::new(body),
-        ))
+
+        if is_recursive {
+            Ok(Expr::LetRec(
+                bound_var_name,
+                Box::new(initializer),
+                Box::new(body),
+            ))
+        } else {
+            Ok(Expr::Let(
+                bound_var_name,
+                Box::new(initializer),
+                Box::new(body),
+            ))
+        }
     }
 
     /// BNF:

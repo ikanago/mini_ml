@@ -12,6 +12,7 @@ fn reserve_keyword() -> HashMap<String, Token> {
     keywords.insert("then".to_string(), Token::Then);
     keywords.insert("else".to_string(), Token::Else);
     keywords.insert("fun".to_string(), Token::Fun);
+    keywords.insert("rec".to_string(), Token::Rec);
     keywords
 }
 

@@ -1,1 +1,1 @@
-let f x x = x + 1 in f 3 3;;
+let rec f x = if x > 0 then x + f (x - 1) else 0 in f 3;;

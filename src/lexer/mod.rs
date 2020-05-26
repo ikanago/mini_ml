@@ -21,6 +21,7 @@ pub enum Token {
     Else,
     Fun,
     RArrow,
+    Rec,
     SemiColon,
 }
 
