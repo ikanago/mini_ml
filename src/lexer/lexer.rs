@@ -60,65 +60,20 @@ impl<'a> Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
-    pub fn lex_all(&mut self) -> Result<&Vec<Token>, LexError> {
-        while !self.is_eof() {
-            match self.lex() {
-                Ok(Token::WhiteSpace) => continue,
-                Ok(token) => self.tokens.push(token),
-                Err(err) => return Err(err),
+    pub fn lex(&mut self) -> Result<&Vec<Token>, LexError> {
+        loop {
+            let token = match self.peek() {
+                Some(b'0'..=b'9') => self.lex_number(),
+                Some(b'a'..=b'z') | Some(b'A'..=b'Z') => self.lex_identifier(),
+                Some(b' ') | Some(b'\n') => self.skip_spaces(),
+                None => break,
+                _ => self.lex_symbol(),
+            }?;
+            if token != Token::WhiteSpace {
+                self.tokens.push(token);
             }
         }
         Ok(&self.tokens)
-    }
-
-    fn lex(&mut self) -> Result<Token, LexError> {
-        match self.input[self.pos] {
-            b'+' => self.lex_plus(),
-            b'-' => self.lex_hyphen(),
-            b'*' => self.lex_asterisk(),
-            b'<' => self.lex_lt(),
-            b'>' => self.lex_gt(),
-            b'0'..=b'9' => self.lex_number(),
-            b'a'..=b'z' | b'A'..=b'Z' => self.lex_identifier(),
-            b'(' => self.lex_lparen(),
-            b')' => self.lex_rparen(),
-            b'=' => self.lex_equal(),
-            b' ' | b'\n' => self.skip_spaces(),
-            b';' => self.lex_semicolon(),
-            _ => unimplemented!(),
-        }
-    }
-
-    fn lex_plus(&mut self) -> Result<Token, LexError> {
-        self.next();
-        Ok(Token::Plus)
-    }
-
-    fn lex_hyphen(&mut self) -> Result<Token, LexError> {
-        self.next();
-        match self.peek() {
-            Some(b'>') => {
-                self.next();
-                Ok(Token::RArrow)
-            }
-            Some(_) => Ok(Token::Minus),
-            None => Err(LexError::Eof),
-        }
-    }
-
-    fn lex_asterisk(&mut self) -> Result<Token, LexError> {
-        self.next();
-        Ok(Token::Asterisk)
-    }
-
-    fn lex_lt(&mut self) -> Result<Token, LexError> {
-        self.next();
-        Ok(Token::Lt)
-    }
-
-    fn lex_gt(&mut self) -> Result<Token, LexError> {
-        self.next();
-        Ok(Token::Gt)
     }
 
     fn lex_number(&mut self) -> Result<Token, LexError> {
@@ -136,39 +91,9 @@ impl<'a> Lexer<'a> {
         Ok(token)
     }
 
-    fn lex_lparen(&mut self) -> Result<Token, LexError> {
-        self.next();
-        Ok(Token::LParen)
-    }
-
-    fn lex_rparen(&mut self) -> Result<Token, LexError> {
-        self.next();
-        Ok(Token::RParen)
-    }
-
-    fn lex_equal(&mut self) -> Result<Token, LexError> {
-        self.next();
-        Ok(Token::Equal)
-    }
-
     fn skip_spaces(&mut self) -> Result<Token, LexError> {
         self.skip_while(|&b| b == b' ' || b == b'\n');
         Ok(Token::WhiteSpace)
-    }
-
-    fn lex_semicolon(&mut self) -> Result<Token, LexError> {
-        self.next();
-        match self.peek() {
-            Some(b';') => {
-                self.next();
-                Ok(Token::SemiColon)
-            }
-            Some(_) => Err(LexError::UnexpectedToken(format!(
-                "Expected `;;`, but got {}",
-                self.peek().unwrap()
-            ))),
-            None => Err(LexError::Eof),
-        }
     }
 
     fn take_while(&mut self, satisfy: impl Fn(&u8) -> bool) -> String {
@@ -184,6 +109,38 @@ impl<'a> Lexer<'a> {
             self.next();
         }
     }
+
+    fn lex_symbol(&mut self) -> Result<Token, LexError> {
+        match self.next() {
+            Some(b'+') => Ok(Token::Plus),
+            Some(b'*') => Ok(Token::Asterisk),
+            Some(b'<') => Ok(Token::Lt),
+            Some(b'>') => Ok(Token::Gt),
+            Some(b'(') => Ok(Token::LParen),
+            Some(b')') => Ok(Token::RParen),
+            Some(b'=') => Ok(Token::Equal),
+            Some(b'-') => match self.peek() {
+                Some(b'>') => {
+                    self.next();
+                    Ok(Token::RArrow)
+                }
+                Some(_) => Ok(Token::Minus),
+                None => Err(LexError::UnexpectedEof),
+            },
+            Some(b';') => match self.peek() {
+                Some(b';') => {
+                    self.next();
+                    Ok(Token::SemiColon)
+                }
+                Some(_) => Err(LexError::UnexpectedToken(format!(
+                    "Expected `;;`, but got {}",
+                    self.peek().unwrap()
+                ))),
+                None => Err(LexError::UnexpectedEof),
+            },
+            _ => unimplemented!(),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -193,7 +150,7 @@ mod tests {
     #[test]
     fn test_lex_if() -> Result<(), LexError> {
         let mut lexer = Lexer::new("if a < b then if a > b then 1 else (b - a) * 4 else 4;;");
-        let tokens = lexer.lex_all()?;
+        let tokens = lexer.lex()?;
         assert_eq!(
             tokens,
             &vec![
@@ -227,7 +184,7 @@ mod tests {
     #[test]
     fn test_lex_let() -> Result<(), LexError> {
         let mut lexer = Lexer::new("let a = 3 in a + 2;;");
-        let tokens = lexer.lex_all()?;
+        let tokens = lexer.lex()?;
         assert_eq!(
             tokens,
             &vec![
@@ -248,7 +205,7 @@ mod tests {
     #[test]
     fn test_lex_fun() -> Result<(), LexError> {
         let mut lexer = Lexer::new("let f = fun x -> fun y -> x + y in f 2 3;;");
-        let tokens = lexer.lex_all()?;
+        let tokens = lexer.lex()?;
         assert_eq!(
             tokens,
             &vec![

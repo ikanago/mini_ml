@@ -34,5 +34,6 @@ pub enum Token {
 #[derive(Debug)]
 pub enum LexError {
     UnexpectedToken(String),
-    Eof,
+    UnexpectedEof,
+    NormalEof,
 }
