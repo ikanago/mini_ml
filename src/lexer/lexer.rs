@@ -10,6 +10,8 @@ fn reserve_keyword() -> HashMap<String, Token> {
     keywords.insert("if".to_string(), Token::If);
     keywords.insert("then".to_string(), Token::Then);
     keywords.insert("else".to_string(), Token::Else);
+    keywords.insert("with".to_string(), Token::With);
+    keywords.insert("match".to_string(), Token::Match);
     keywords.insert("fun".to_string(), Token::Fun);
     keywords.insert("rec".to_string(), Token::Rec);
     keywords
@@ -118,6 +120,8 @@ impl<'a> Lexer<'a> {
             Some(b'>') => Ok(Token::Gt),
             Some(b'(') => Ok(Token::LParen),
             Some(b')') => Ok(Token::RParen),
+            Some(b'[') => Ok(Token::LBracket),
+            Some(b']') => Ok(Token::RBracket),
             Some(b'=') => Ok(Token::Equal),
             Some(b'-') => match self.peek() {
                 Some(b'>') => {
@@ -125,6 +129,17 @@ impl<'a> Lexer<'a> {
                     Ok(Token::RArrow)
                 }
                 Some(_) => Ok(Token::Minus),
+                None => Err(LexError::UnexpectedEof),
+            },
+            Some(b':') => match self.peek() {
+                Some(b':') => {
+                    self.next();
+                    Ok(Token::Append)
+                }
+                Some(_) => Err(LexError::UnexpectedToken(format!(
+                    "Expected `;;`, but got {}",
+                    self.peek().unwrap()
+                ))),
                 None => Err(LexError::UnexpectedEof),
             },
             Some(b';') => match self.peek() {
@@ -149,7 +164,7 @@ mod tests {
     use crate::lexer::{LexError, Token};
     #[test]
     fn test_lex_keywords() -> Result<(), LexError> {
-        let mut lexer = Lexer::new("true false let in if then else fun rec");
+        let mut lexer = Lexer::new("true false let in if then else match with fun rec");
         let tokens = lexer.lex()?;
         assert_eq!(
             tokens,
@@ -161,6 +176,8 @@ mod tests {
                 Token::If,
                 Token::Then,
                 Token::Else,
+                Token::Match,
+                Token::With,
                 Token::Fun,
                 Token::Rec,
             ],
@@ -198,7 +215,7 @@ mod tests {
 
     #[test]
     fn test_lex_symbols() -> Result<(), LexError> {
-        let mut lexer = Lexer::new("+-* < >() =->;;");
+        let mut lexer = Lexer::new("+-* < >()[ ] =->;;");
         let tokens = lexer.lex()?;
         assert_eq!(
             tokens,
@@ -210,6 +227,8 @@ mod tests {
                 Token::Gt,
                 Token::LParen,
                 Token::RParen,
+                Token::LBracket,
+                Token::RBracket,
                 Token::Equal,
                 Token::RArrow,
                 Token::SemiColon,
