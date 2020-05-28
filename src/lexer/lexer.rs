@@ -34,67 +34,93 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    pub fn lex(&mut self) -> Result<&Vec<Token>, LexError> {
-        while self.pos < self.input.len() {
-            let token = match self.input[self.pos] {
-                b'+' => self.lex_plus(),
-                b'-' => {
-                    if self.pos != self.input.len() - 1 && self.input[self.pos + 1] == b'>' {
-                        self.lex_rarrow()
-                    } else {
-                        self.lex_minus()
-                    }
-                }
-                b'*' => self.lex_asterisk(),
-                b'<' => self.lex_lt(),
-                b'>' => self.lex_gt(),
-                b'0'..=b'9' => self.lex_number(),
-                b'a'..=b'z' | b'A'..=b'Z' => self.lex_identifier(),
-                b'(' => self.lex_lparen(),
-                b')' => self.lex_rparen(),
-                b'=' => self.lex_equal(),
-                b' ' | b'\n' => self.skip_spaces(),
-                b';' => self.lex_semicolon(),
-                _ => unimplemented!(),
-            };
-            if let Some(token) = token {
-                self.tokens.push(token);
+    fn is_eof(&self) -> bool {
+        self.pos >= self.input.len()
+    }
+
+    fn peek(&self) -> Option<&u8> {
+        if self.is_eof() {
+            None
+        } else {
+            Some(&self.input[self.pos])
+        }
+    }
+
+    fn next(&mut self) -> Option<u8> {
+        match self.peek() {
+            Some(&c) => {
+                self.pos += 1;
+                Some(c)
+            }
+            None => None,
+        }
+    }
+
+    // todo: peekableではread_manyにposがずれた状態で突入するのでだめ   自前で実装する
+    pub fn lex_all(&mut self) -> Result<&Vec<Token>, LexError> {
+        while !self.is_eof() {
+            match self.lex() {
+                Ok(token) => self.tokens.push(token),
+                Err(err) => return Err(err),
             }
         }
         Ok(&self.tokens)
     }
 
-    fn lex_plus(&mut self) -> Option<Token> {
-        self.pos += 1;
-        Some(Token::Plus)
+    fn lex(&mut self) -> Result<Token, LexError> {
+        match self.input[self.pos] {
+            b'+' => self.lex_plus(),
+            b'-' => self.lex_hyphen(),
+            b'*' => self.lex_asterisk(),
+            b'<' => self.lex_lt(),
+            b'>' => self.lex_gt(),
+            b'0'..=b'9' => self.lex_number(),
+            b'a'..=b'z' | b'A'..=b'Z' => self.lex_identifier(),
+            b'(' => self.lex_lparen(),
+            b')' => self.lex_rparen(),
+            b'=' => self.lex_equal(),
+            b' ' | b'\n' => {
+                self.skip_spaces()?;
+                self.lex()
+            }
+            b';' => self.lex_semicolon(),
+            _ => unimplemented!(),
+        }
     }
 
-    fn lex_rarrow(&mut self) -> Option<Token> {
-        self.pos += 2;
-        Some(Token::RArrow)
+    fn lex_plus(&mut self) -> Result<Token, LexError> {
+        self.next();
+        Ok(Token::Plus)
     }
 
-    fn lex_minus(&mut self) -> Option<Token> {
-        self.pos += 1;
-        Some(Token::Minus)
+    fn lex_hyphen(&mut self) -> Result<Token, LexError> {
+        self.next();
+        match self.peek() {
+            Some(b'>') => {
+                self.next();
+                Ok(Token::RArrow)
+            }
+            Some(_) => Ok(Token::Minus),
+            None => Err(LexError::Eof),
+        }
     }
 
-    fn lex_asterisk(&mut self) -> Option<Token> {
-        self.pos += 1;
-        Some(Token::Asterisk)
+    fn lex_asterisk(&mut self) -> Result<Token, LexError> {
+        self.next();
+        Ok(Token::Asterisk)
     }
 
-    fn lex_lt(&mut self) -> Option<Token> {
-        self.pos += 1;
-        Some(Token::Lt)
+    fn lex_lt(&mut self) -> Result<Token, LexError> {
+        self.next();
+        Ok(Token::Lt)
     }
 
-    fn lex_gt(&mut self) -> Option<Token> {
-        self.pos += 1;
-        Some(Token::Gt)
+    fn lex_gt(&mut self) -> Result<Token, LexError> {
+        self.next();
+        Ok(Token::Gt)
     }
 
-    fn lex_number(&mut self) -> Option<Token> {
+    fn lex_number(&mut self) -> Result<Token, LexError> {
         let start = self.pos;
         let end = self.read_many(|b| b"0123456789".contains(&b));
         let num = from_utf8(&self.input[start..end])
@@ -102,58 +128,60 @@ impl<'a> Lexer<'a> {
             .parse::<u64>()
             .unwrap();
         self.pos = end;
-        Some(Token::Number(num))
+        Ok(Token::Number(num))
     }
 
-    fn lex_identifier(&mut self) -> Option<Token> {
+    fn lex_identifier(&mut self) -> Result<Token, LexError> {
         let start = self.pos;
         let end = self.read_many(|b| b.is_ascii_alphanumeric() || b == b'_');
-        self.pos = end;
         let identifier = from_utf8(&self.input[start..end]).unwrap().to_string();
         let token = match self.keywords.get(&identifier) {
             Some(keyword) => keyword.clone(),
             None => Token::Identifier(identifier),
         };
-        Some(token)
+        Ok(token)
     }
 
-    fn lex_lparen(&mut self) -> Option<Token> {
-        self.pos += 1;
-        Some(Token::LParen)
+    fn lex_lparen(&mut self) -> Result<Token, LexError> {
+        self.next();
+        Ok(Token::LParen)
     }
 
-    fn lex_rparen(&mut self) -> Option<Token> {
-        self.pos += 1;
-        Some(Token::RParen)
+    fn lex_rparen(&mut self) -> Result<Token, LexError> {
+        self.next();
+        Ok(Token::RParen)
     }
 
-    fn lex_equal(&mut self) -> Option<Token> {
-        self.pos += 1;
-        Some(Token::Equal)
+    fn lex_equal(&mut self) -> Result<Token, LexError> {
+        self.next();
+        Ok(Token::Equal)
     }
 
-    fn skip_spaces(&mut self) -> Option<Token> {
+    fn skip_spaces(&mut self) -> Result<(), LexError> {
         let skipped_pos = self.read_many(|b| b == b' ' || b == b'\n');
-        self.pos = skipped_pos;
-        None
+        Ok(())
     }
 
-    fn lex_semicolon(&mut self) -> Option<Token> {
-        if self.pos + 1 == self.input.len() {
-            return None;
-        } else if self.input[self.pos] != b';' {
-            return None;
+    fn lex_semicolon(&mut self) -> Result<Token, LexError> {
+        self.next();
+        match self.peek() {
+            Some(b';') => {
+                self.next();
+                Ok(Token::SemiColon)
+            }
+            Some(_) => Err(LexError::UnexpectedToken(format!(
+                "Expected `;;`, but got {}",
+                self.peek().unwrap()
+            ))),
+            None => Err(LexError::Eof),
         }
-        self.pos += 2;
-        Some(Token::SemiColon)
     }
 
-    fn read_many(&self, satisfy: impl Fn(u8) -> bool) -> usize {
-        let mut pos = self.pos;
-        while pos < self.input.len() && satisfy(self.input[pos]) {
-            pos += 1;
+    fn read_many(&mut self, satisfy: impl Fn(u8) -> bool) -> usize {
+        while !self.is_eof() && satisfy(self.input[self.pos]) {
+            self.next();
         }
-        pos
+        self.pos
     }
 }
 
@@ -164,7 +192,7 @@ mod tests {
     #[test]
     fn test_lex_if() -> Result<(), LexError> {
         let mut lexer = Lexer::new("if a < b then if a > b then 1 else (b - a) * 4 else 4;;");
-        let tokens = lexer.lex()?;
+        let tokens = lexer.lex_all()?;
         assert_eq!(
             tokens,
             &vec![
@@ -198,7 +226,7 @@ mod tests {
     #[test]
     fn test_lex_let() -> Result<(), LexError> {
         let mut lexer = Lexer::new("let a = 3 in a + 2;;");
-        let tokens = lexer.lex()?;
+        let tokens = lexer.lex_all()?;
         assert_eq!(
             tokens,
             &vec![
@@ -219,7 +247,7 @@ mod tests {
     #[test]
     fn test_lex_fun() -> Result<(), LexError> {
         let mut lexer = Lexer::new("let f = fun x -> fun y -> x + y in f 2 3;;");
-        let tokens = lexer.lex()?;
+        let tokens = lexer.lex_all()?;
         assert_eq!(
             tokens,
             &vec![

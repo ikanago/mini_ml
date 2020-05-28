@@ -13,12 +13,17 @@ pub enum Token {
     Gt,
     LParen,
     RParen,
+    LBracket,
+    RBracket,
     Let,
     In,
     Equal,
     If,
     Then,
     Else,
+    Match,
+    With,
+    Append,
     Fun,
     RArrow,
     Rec,
@@ -26,4 +31,7 @@ pub enum Token {
 }
 
 #[derive(Debug)]
-pub enum LexError {}
+pub enum LexError {
+    UnexpectedToken(String),
+    Eof,
+}

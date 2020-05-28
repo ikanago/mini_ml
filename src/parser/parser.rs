@@ -89,8 +89,8 @@ impl<'a> Parser<'a> {
     }
 
     /// BNF:
-    /// LET_EXPR ::= `let` IDENT = EXPR IN EXPR
-    ///            | `let` IDENT IDENT* = EXPR IN EXPR
+    /// LET_EXPR ::= `let` `rec`? IDENT = EXPR `in` EXPR
+    ///            | `let` `rec`? IDENT IDENT* = EXPR `in` EXPR
     fn parse_let(&mut self) -> Result<Expr, ParseError> {
         self.expect_token(Token::Let)?;
         let is_recursive = self.peek() == Some(&Token::Rec);

@@ -11,7 +11,7 @@ use crate::parser::parser::Parser;
 /// If `dump_token` is true, dump lexed tokens, so do `dump_ast`.
 pub fn interpret(source_code: &str, dump_token: bool, dump_ast: bool) -> Vec<ExprVal> {
     let mut lexer = Lexer::new(source_code);
-    let tokens = match lexer.lex() {
+    let tokens = match lexer.lex_all() {
         Ok(tokens) => tokens,
         Err(err) => {
             eprintln!("{:?}", err);
