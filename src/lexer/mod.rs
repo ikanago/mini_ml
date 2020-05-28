@@ -28,6 +28,7 @@ pub enum Token {
     RArrow,
     Rec,
     SemiColon,
+    WhiteSpace,
 }
 
 #[derive(Debug)]

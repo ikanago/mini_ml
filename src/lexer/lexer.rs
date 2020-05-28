@@ -1,6 +1,5 @@
 use crate::lexer::{LexError, Token};
 use std::collections::HashMap;
-use std::str::from_utf8;
 
 fn reserve_keyword() -> HashMap<String, Token> {
     let mut keywords = HashMap::new();
@@ -38,6 +37,8 @@ impl<'a> Lexer<'a> {
         self.pos >= self.input.len()
     }
 
+    /// Take a look at a next token.
+    /// If it exists, return a reference of it.
     fn peek(&self) -> Option<&u8> {
         if self.is_eof() {
             None
@@ -46,6 +47,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    /// Peek a next token and if it exists, return it.
     fn next(&mut self) -> Option<u8> {
         match self.peek() {
             Some(&c) => {
@@ -55,11 +57,13 @@ impl<'a> Lexer<'a> {
             None => None,
         }
     }
+}
 
-    // todo: peekableではread_manyにposがずれた状態で突入するのでだめ   自前で実装する
+impl<'a> Lexer<'a> {
     pub fn lex_all(&mut self) -> Result<&Vec<Token>, LexError> {
         while !self.is_eof() {
             match self.lex() {
+                Ok(Token::WhiteSpace) => continue,
                 Ok(token) => self.tokens.push(token),
                 Err(err) => return Err(err),
             }
@@ -79,10 +83,7 @@ impl<'a> Lexer<'a> {
             b'(' => self.lex_lparen(),
             b')' => self.lex_rparen(),
             b'=' => self.lex_equal(),
-            b' ' | b'\n' => {
-                self.skip_spaces()?;
-                self.lex()
-            }
+            b' ' | b'\n' => self.skip_spaces(),
             b';' => self.lex_semicolon(),
             _ => unimplemented!(),
         }
@@ -121,20 +122,13 @@ impl<'a> Lexer<'a> {
     }
 
     fn lex_number(&mut self) -> Result<Token, LexError> {
-        let start = self.pos;
-        let end = self.read_many(|b| b"0123456789".contains(&b));
-        let num = from_utf8(&self.input[start..end])
-            .unwrap()
-            .parse::<u64>()
-            .unwrap();
-        self.pos = end;
+        let number_literal = self.take_while(|b| b"0123456789".contains(&b));
+        let num = number_literal.parse::<u64>().unwrap();
         Ok(Token::Number(num))
     }
 
     fn lex_identifier(&mut self) -> Result<Token, LexError> {
-        let start = self.pos;
-        let end = self.read_many(|b| b.is_ascii_alphanumeric() || b == b'_');
-        let identifier = from_utf8(&self.input[start..end]).unwrap().to_string();
+        let identifier = self.take_while(|&b| b.is_ascii_alphanumeric() || b == b'_');
         let token = match self.keywords.get(&identifier) {
             Some(keyword) => keyword.clone(),
             None => Token::Identifier(identifier),
@@ -157,9 +151,9 @@ impl<'a> Lexer<'a> {
         Ok(Token::Equal)
     }
 
-    fn skip_spaces(&mut self) -> Result<(), LexError> {
-        let skipped_pos = self.read_many(|b| b == b' ' || b == b'\n');
-        Ok(())
+    fn skip_spaces(&mut self) -> Result<Token, LexError> {
+        self.skip_while(|&b| b == b' ' || b == b'\n');
+        Ok(Token::WhiteSpace)
     }
 
     fn lex_semicolon(&mut self) -> Result<Token, LexError> {
@@ -177,11 +171,18 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn read_many(&mut self, satisfy: impl Fn(u8) -> bool) -> usize {
-        while !self.is_eof() && satisfy(self.input[self.pos]) {
+    fn take_while(&mut self, satisfy: impl Fn(&u8) -> bool) -> String {
+        let mut taken_chars = String::new();
+        while !self.is_eof() && satisfy(self.peek().unwrap()) {
+            taken_chars.push(self.next().unwrap() as char);
+        }
+        taken_chars
+    }
+
+    fn skip_while(&mut self, satisfy: impl Fn(&u8) -> bool) -> () {
+        while !self.is_eof() && satisfy(self.peek().unwrap()) {
             self.next();
         }
-        self.pos
     }
 }
 
