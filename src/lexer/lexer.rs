@@ -148,83 +148,70 @@ mod tests {
     use crate::lexer::lexer::Lexer;
     use crate::lexer::{LexError, Token};
     #[test]
-    fn test_lex_if() -> Result<(), LexError> {
-        let mut lexer = Lexer::new("if a < b then if a > b then 1 else (b - a) * 4 else 4;;");
+    fn test_lex_keywords() -> Result<(), LexError> {
+        let mut lexer = Lexer::new("true false let in if then else fun rec");
         let tokens = lexer.lex()?;
         assert_eq!(
             tokens,
             &vec![
+                Token::True,
+                Token::False,
+                Token::Let,
+                Token::In,
                 Token::If,
-                Token::Identifier("a".to_string()),
-                Token::Lt,
-                Token::Identifier("b".to_string()),
                 Token::Then,
-                Token::If,
-                Token::Identifier("a".to_string()),
-                Token::Gt,
-                Token::Identifier("b".to_string()),
-                Token::Then,
-                Token::Number(1),
                 Token::Else,
-                Token::LParen,
-                Token::Identifier("b".to_string()),
+                Token::Fun,
+                Token::Rec,
+            ],
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_lex_numbers() -> Result<(), LexError> {
+        let mut lexer = Lexer::new("123456789 987654321");
+        let tokens = lexer.lex()?;
+        assert_eq!(
+            tokens,
+            &vec![Token::Number(123456789), Token::Number(987654321),],
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_lex_identifiers() -> Result<(), LexError> {
+        let mut lexer = Lexer::new("let f abc aBC A_b_C");
+        let tokens = lexer.lex()?;
+        assert_eq!(
+            tokens,
+            &vec![
+                Token::Let,
+                Token::Identifier("f".to_string()),
+                Token::Identifier("abc".to_string()),
+                Token::Identifier("aBC".to_string()),
+                Token::Identifier("A_b_C".to_string()),
+            ],
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_lex_symbols() -> Result<(), LexError> {
+        let mut lexer = Lexer::new("+-* < >() =->;;");
+        let tokens = lexer.lex()?;
+        assert_eq!(
+            tokens,
+            &vec![
+                Token::Plus,
                 Token::Minus,
-                Token::Identifier("a".to_string()),
-                Token::RParen,
                 Token::Asterisk,
-                Token::Number(4),
-                Token::Else,
-                Token::Number(4),
-                Token::SemiColon,
-            ],
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn test_lex_let() -> Result<(), LexError> {
-        let mut lexer = Lexer::new("let a = 3 in a + 2;;");
-        let tokens = lexer.lex()?;
-        assert_eq!(
-            tokens,
-            &vec![
-                Token::Let,
-                Token::Identifier("a".to_string()),
+                Token::Lt,
+                Token::Gt,
+                Token::LParen,
+                Token::RParen,
                 Token::Equal,
-                Token::Number(3),
-                Token::In,
-                Token::Identifier("a".to_string()),
-                Token::Plus,
-                Token::Number(2),
-                Token::SemiColon,
-            ],
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn test_lex_fun() -> Result<(), LexError> {
-        let mut lexer = Lexer::new("let f = fun x -> fun y -> x + y in f 2 3;;");
-        let tokens = lexer.lex()?;
-        assert_eq!(
-            tokens,
-            &vec![
-                Token::Let,
-                Token::Identifier("f".to_string()),
-                Token::Equal,
-                Token::Fun,
-                Token::Identifier("x".to_string()),
                 Token::RArrow,
-                Token::Fun,
-                Token::Identifier("y".to_string()),
-                Token::RArrow,
-                Token::Identifier("x".to_string()),
-                Token::Plus,
-                Token::Identifier("y".to_string()),
-                Token::In,
-                Token::Identifier("f".to_string()),
-                Token::Number(2),
-                Token::Number(3),
                 Token::SemiColon,
             ],
         );
