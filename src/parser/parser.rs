@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use crate::lexer::Token;
 use crate::parser::syntax::{BinOpKind, Expr};
 use crate::parser::ParseError;
@@ -38,7 +39,20 @@ impl<'a> Parser<'a> {
         Some(token)
     }
 
-    /// Check if a current token has expected type and proceed to next one.
+    // If a next token is expected type, proceed to next.
+    fn consume(&mut self, expected_token: Token) -> Result<bool, ParseError> {
+        match self.peek() {
+            Some(next_token) => if next_token == &expected_token {
+                self.next();
+                Ok(true)
+            } else {
+                Ok(false)
+            }
+            None => Err(ParseError::Eof),
+        }
+    }
+
+    /// Check if a next token has expected type and proceed to next.
     fn expect_token(&mut self, expected_token: Token) -> Result<(), ParseError> {
         self.next().ok_or(ParseError::Eof).and_then(|token| {
             if token == expected_token {
@@ -50,13 +64,15 @@ impl<'a> Parser<'a> {
             }
         })
     }
+}
 
+impl<'a> Parser<'a> {
     /// Parse tokens and build AST.
     pub fn parse(&mut self) -> Result<Vec<Expr>, ParseError> {
         let mut asts = Vec::new();
         loop {
             let ast = self.parse_expr()?;
-            self.expect_token(Token::SemiColon)?;
+            self.expect_token(Token::DoubleSemicolon)?;
             asts.push(ast);
             if self.peek().is_none() {
                 break;
@@ -257,6 +273,15 @@ impl<'a> Parser<'a> {
                         Some(_) => Err(ParseError::UnexpectedToken),
                         None => Err(ParseError::UnclosedParen),
                     }
+                }
+                Token::LBracket => {
+                    let mut expr_array = VecDeque::new();
+                    while !self.consume(Token::RBracket)? {
+                        let element = self.parse_expr()?;
+                        expr_array.push_back(element);
+                        self.consume(Token::Semicolon)?;
+                    }
+                    Ok(Expr::Array(expr_array))
                 }
                 _ => Err(ParseError::NonTerminalSymbol),
             })

@@ -1,6 +1,6 @@
 pub mod eval;
 use crate::parser::syntax::Expr;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 type Env = HashMap<String, ExprVal>;
 
@@ -8,6 +8,7 @@ type Env = HashMap<String, ExprVal>;
 pub enum ExprVal {
     U64(u64),
     Bool(bool),
+    Array(VecDeque<ExprVal>),
     // argument, body, captured environment
     Closure(String, Box<Expr>, Env),
     // closure name, argument, body, captured environment

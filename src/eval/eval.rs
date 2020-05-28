@@ -1,6 +1,6 @@
 use crate::eval::{Env, EvalError, ExprVal};
 use crate::parser::syntax::{BinOpKind, Expr};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 pub fn eval(vec_ast: &[Expr]) -> Result<Vec<ExprVal>, EvalError> {
     let mut result = vec![];
@@ -20,6 +20,13 @@ fn eval_expression(ast: &Expr, environment: &mut Env) -> Result<ExprVal, EvalErr
         },
         &Expr::U64(n) => Ok(ExprVal::U64(*n)),
         &Expr::Bool(b) => Ok(ExprVal::Bool(*b)),
+        &Expr::Array(array) => {
+            let mut evaled_array = VecDeque::new();
+            for element in array {
+                evaled_array.push_back(eval_expression(element, environment)?);
+            }
+            Ok(ExprVal::Array(evaled_array))
+        }
         &Expr::BinOp(op, lhs, rhs) => {
             let lhs = eval_expression(lhs, environment)?;
             let rhs = eval_expression(rhs, environment)?;

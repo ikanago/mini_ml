@@ -134,7 +134,7 @@ impl<'a> Lexer<'a> {
             Some(b':') => match self.peek() {
                 Some(b':') => {
                     self.next();
-                    Ok(Token::Append)
+                    Ok(Token::Cons)
                 }
                 Some(_) => Err(LexError::UnexpectedToken(format!(
                     "Expected `;;`, but got {}",
@@ -145,12 +145,9 @@ impl<'a> Lexer<'a> {
             Some(b';') => match self.peek() {
                 Some(b';') => {
                     self.next();
-                    Ok(Token::SemiColon)
+                    Ok(Token::DoubleSemicolon)
                 }
-                Some(_) => Err(LexError::UnexpectedToken(format!(
-                    "Expected `;;`, but got {}",
-                    self.peek().unwrap()
-                ))),
+                Some(_) => Ok(Token::Semicolon),
                 None => Err(LexError::UnexpectedEof),
             },
             _ => unimplemented!(),
@@ -215,7 +212,7 @@ mod tests {
 
     #[test]
     fn test_lex_symbols() -> Result<(), LexError> {
-        let mut lexer = Lexer::new("+-* < >()[ ] =->;;");
+        let mut lexer = Lexer::new("+-* < >()[ ] =->; ;;");
         let tokens = lexer.lex()?;
         assert_eq!(
             tokens,
@@ -231,7 +228,8 @@ mod tests {
                 Token::RBracket,
                 Token::Equal,
                 Token::RArrow,
-                Token::SemiColon,
+                Token::Semicolon,
+                Token::DoubleSemicolon,
             ],
         );
         Ok(())

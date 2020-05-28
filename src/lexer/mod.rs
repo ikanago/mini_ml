@@ -23,11 +23,12 @@ pub enum Token {
     Else,
     Match,
     With,
-    Append,
+    Cons,
     Fun,
     RArrow,
     Rec,
-    SemiColon,
+    Semicolon,
+    DoubleSemicolon,
     WhiteSpace,
 }
 
