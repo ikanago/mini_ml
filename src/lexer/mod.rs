@@ -23,6 +23,7 @@ pub enum Token {
     Else,
     Match,
     With,
+    VerticalBar,
     Cons,
     Fun,
     RArrow,

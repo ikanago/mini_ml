@@ -1,5 +1,5 @@
 use crate::eval::{Env, EvalError, ExprVal};
-use crate::parser::syntax::{BinOpKind, Expr};
+use crate::parser::syntax::{BinOpKind, Expr, Pattern};
 use std::collections::{HashMap, VecDeque};
 
 pub fn eval(vec_ast: &[Expr]) -> Result<Vec<ExprVal>, EvalError> {
@@ -58,6 +58,15 @@ fn eval_expression(ast: &Expr, environment: &mut Env) -> Result<ExprVal, EvalErr
                 )),
             }
         }
+        &Expr::Match(condition, patterns) => {
+            let condition = eval_expression(condition, environment)?;
+            match condition {
+                ExprVal::Array(mut array) => {
+                    match_pattern_array(&mut array, patterns.clone(), environment)
+                }
+                _ => unimplemented!(),
+            }
+        }
         &Expr::Fun(arg, body) => Ok(ExprVal::Closure(
             arg.clone(),
             body.clone(),
@@ -92,6 +101,28 @@ fn apply_operator(op: BinOpKind, lhs: ExprVal, rhs: ExprVal) -> Result<ExprVal, 
         _ => Err(EvalError::UnsupportedOperandType(
             "Both arguments must be u64".to_string(),
         )),
+    }
+}
+
+fn match_pattern_array(
+    array: &mut VecDeque<ExprVal>,
+    patterns: Vec<(Pattern, Expr)>,
+    environment: &mut Env,
+) -> Result<ExprVal, EvalError> {
+    let mut patterns = patterns.iter();
+    loop {
+        match patterns.next() {
+            Some((pattern, arm)) => match pattern.clone() {
+                Pattern::Nil if array.len() == 0 => break eval_expression(arm, environment),
+                Pattern::Cons(head, tail) => {
+                    environment.insert(head, array.pop_front().unwrap());
+                    environment.insert(tail, ExprVal::Array(array.clone()));
+                    break eval_expression(arm, environment);
+                }
+                _ => continue,
+            },
+            None => break Err(EvalError::PatternsNotExhaustive),
+        }
     }
 }
 
@@ -130,6 +161,13 @@ mod tests {
         let source_code = "let rec fact x = if x > 0 then x * fact (x - 1) else 1 in fact 5;;";
         let result = interpret(source_code, false, false);
         assert_eq!(result, vec![ExprVal::U64(120)],);
+    }
+
+    #[test]
+    fn test_eval_list_pattern_matching() {
+        let source_code = "let a = [1; 2; 3; 4; 5] in let rec len x = match x with | [] -> 0 | head::tail -> 1 + len tail in len a;;";
+        let result = interpret(source_code, false, false);
+        assert_eq!(result, vec![ExprVal::U64(5)],);
     }
 
     #[test]

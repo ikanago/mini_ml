@@ -1,7 +1,7 @@
-use std::collections::VecDeque;
 use crate::lexer::Token;
-use crate::parser::syntax::{BinOpKind, Expr};
+use crate::parser::syntax::{BinOpKind, Expr, Pattern};
 use crate::parser::ParseError;
+use std::collections::VecDeque;
 
 ///Specify caller of `Parser::parse_multi_args_fun`.
 #[derive(Clone, Debug, PartialEq)]
@@ -42,11 +42,13 @@ impl<'a> Parser<'a> {
     // If a next token is expected type, proceed to next.
     fn consume(&mut self, expected_token: Token) -> Result<bool, ParseError> {
         match self.peek() {
-            Some(next_token) => if next_token == &expected_token {
-                self.next();
-                Ok(true)
-            } else {
-                Ok(false)
+            Some(next_token) => {
+                if next_token == &expected_token {
+                    self.next();
+                    Ok(true)
+                } else {
+                    Ok(false)
+                }
             }
             None => Err(ParseError::Eof),
         }
@@ -87,6 +89,7 @@ impl<'a> Parser<'a> {
         match self.peek() {
             Some(&Token::If) => self.parse_if(),
             Some(&Token::Let) => self.parse_let(),
+            Some(&Token::Match) => self.parse_match(),
             Some(&Token::Fun) => self.parse_fun(),
             _ => self.parse_compare(),
         }
@@ -142,6 +145,41 @@ impl<'a> Parser<'a> {
                 Box::new(body),
             ))
         }
+    }
+
+    /// BNF:
+    /// MATCH_EXPR ::=
+    fn parse_match(&mut self) -> Result<Expr, ParseError> {
+        self.expect_token(Token::Match)?;
+        let condition = self.parse_expr()?;
+        self.expect_token(Token::With)?;
+        let mut clauses = Vec::new();
+
+        while self.consume(Token::VerticalBar)? {
+            let pattern = match self.next() {
+                Some(Token::LBracket) => {
+                    self.expect_token(Token::RBracket)?;
+                    Pattern::Nil
+                }
+                Some(Token::Identifier(head)) => {
+                    let head = head.clone();
+                    self.expect_token(Token::Cons)?;
+                    let tail = match self.next() {
+                        Some(Token::Identifier(tail)) => tail,
+                        _ => return Err(ParseError::UnexpectedToken),
+                    };
+                    Pattern::Cons(
+                        head,
+                        tail.clone(),
+                    )
+                }
+                _ => return Err(ParseError::UnexpectedToken),
+            };
+            self.expect_token(Token::RArrow)?;
+            let arm = self.parse_expr()?;
+            clauses.push((pattern, arm));
+        }
+        Ok(Expr::Match(Box::new(condition), clauses))
     }
 
     /// BNF:

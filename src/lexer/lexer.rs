@@ -123,6 +123,7 @@ impl<'a> Lexer<'a> {
             Some(b'[') => Ok(Token::LBracket),
             Some(b']') => Ok(Token::RBracket),
             Some(b'=') => Ok(Token::Equal),
+            Some(b'|') => Ok(Token::VerticalBar),
             Some(b'-') => match self.peek() {
                 Some(b'>') => {
                     self.next();
@@ -212,7 +213,7 @@ mod tests {
 
     #[test]
     fn test_lex_symbols() -> Result<(), LexError> {
-        let mut lexer = Lexer::new("+-* < >()[ ] =->; ;;");
+        let mut lexer = Lexer::new("+-* < >()[ ] =->; :: ;;");
         let tokens = lexer.lex()?;
         assert_eq!(
             tokens,
@@ -229,6 +230,7 @@ mod tests {
                 Token::Equal,
                 Token::RArrow,
                 Token::Semicolon,
+                Token::Cons,
                 Token::DoubleSemicolon,
             ],
         );

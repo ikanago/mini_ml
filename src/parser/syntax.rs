@@ -19,14 +19,14 @@ pub enum Expr {
     Let(String, Box<Expr>, Box<Expr>),
     LetRec(String, Box<Expr>, Box<Expr>),
     If(Box<Expr>, Box<Expr>, Box<Expr>),
+    Match(Box<Expr>, Vec<(Pattern, Expr)>),
     Fun(String, Box<Expr>),
     Apply(Box<Expr>, Box<Expr>),
 }
 
-// enum Type {
-//     U64,
-//     Bool,
-//     Var,
-//     Fun,
-//     List,
-// }
+#[derive(Clone, Debug, PartialEq)]
+pub enum Pattern {
+    Nil,
+    Cons(String, String),
+    Var(String),
+}

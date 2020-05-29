@@ -18,6 +18,7 @@ pub enum ExprVal {
 #[derive(Debug)]
 pub enum EvalError {
     NotBound(String),
+    PatternsNotExhaustive,
     UnexpectedType(String),
     UnsupportedOperandType(String),
 }
