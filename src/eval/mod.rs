@@ -6,7 +6,7 @@ type Env = HashMap<String, ExprVal>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ExprVal {
-    U64(u64),
+    I64(i64),
     Bool(bool),
     Array(VecDeque<ExprVal>),
     // argument, body, captured environment

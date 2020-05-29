@@ -18,7 +18,7 @@ fn eval_expression(ast: &Expr, environment: &mut Env) -> Result<ExprVal, EvalErr
             Some(expr) => Ok(expr.clone()),
             None => Err(EvalError::NotBound(var.clone())),
         },
-        &Expr::U64(n) => Ok(ExprVal::U64(*n)),
+        &Expr::I64(n) => Ok(ExprVal::I64(*n)),
         &Expr::Bool(b) => Ok(ExprVal::Bool(*b)),
         &Expr::Array(array) => {
             let mut evaled_array = VecDeque::new();
@@ -93,17 +93,18 @@ fn eval_expression(ast: &Expr, environment: &mut Env) -> Result<ExprVal, EvalErr
 
 fn apply_operator(op: BinOpKind, lhs: ExprVal, rhs: ExprVal) -> Result<ExprVal, EvalError> {
     match (op, lhs, rhs) {
-        (BinOpKind::Add, ExprVal::U64(n), ExprVal::U64(m)) => Ok(ExprVal::U64(n + m)),
-        (BinOpKind::Sub, ExprVal::U64(n), ExprVal::U64(m)) => Ok(ExprVal::U64(n - m)),
-        (BinOpKind::Mul, ExprVal::U64(n), ExprVal::U64(m)) => Ok(ExprVal::U64(n * m)),
-        (BinOpKind::Lt, ExprVal::U64(n), ExprVal::U64(m)) => Ok(ExprVal::Bool(n < m)),
-        (BinOpKind::Gt, ExprVal::U64(n), ExprVal::U64(m)) => Ok(ExprVal::Bool(n > m)),
+        (BinOpKind::Add, ExprVal::I64(n), ExprVal::I64(m)) => Ok(ExprVal::I64(n + m)),
+        (BinOpKind::Sub, ExprVal::I64(n), ExprVal::I64(m)) => Ok(ExprVal::I64(n - m)),
+        (BinOpKind::Mul, ExprVal::I64(n), ExprVal::I64(m)) => Ok(ExprVal::I64(n * m)),
+        (BinOpKind::Lt, ExprVal::I64(n), ExprVal::I64(m)) => Ok(ExprVal::Bool(n < m)),
+        (BinOpKind::Gt, ExprVal::I64(n), ExprVal::I64(m)) => Ok(ExprVal::Bool(n > m)),
         _ => Err(EvalError::UnsupportedOperandType(
-            "Both arguments must be u64".to_string(),
+            "Both arguments must be i64".to_string(),
         )),
     }
 }
 
+/// Find a matching pattern for an array and execute its match arm.
 fn match_pattern_array(
     array: &mut VecDeque<ExprVal>,
     patterns: Vec<(Pattern, Expr)>,
@@ -136,7 +137,7 @@ mod tests {
         let source_code =
             "let a = 2 in let b = 4 in if a < b then if a > b then 1 else (b - a) * 4 else 4;;";
         let result = interpret(source_code, false, false);
-        assert_eq!(result, vec![ExprVal::U64(8)],);
+        assert_eq!(result, vec![ExprVal::I64(8)],);
         Ok(())
     }
 
@@ -144,30 +145,30 @@ mod tests {
     fn test_eval_fun() {
         let source_code = "let apply = fun f -> fun x -> fun y -> if x < y then f x + y else f x * y in apply (fun x -> x + 1) 5 3;;";
         let result = interpret(source_code, false, false);
-        assert_eq!(result, vec![ExprVal::U64(18)],);
+        assert_eq!(result, vec![ExprVal::I64(18)],);
 
         let source_code = "let apply = fun f x y -> if x < y then f x + y else f x * y in apply (fun x -> x + 1) 5 3;;";
         let result = interpret(source_code, false, false);
-        assert_eq!(result, vec![ExprVal::U64(18)],);
+        assert_eq!(result, vec![ExprVal::I64(18)],);
 
         let source_code =
             "let apply f x y = if x < y then f x + y else f x * y in apply (fun x -> x + 1) 5 3;;";
         let result = interpret(source_code, false, false);
-        assert_eq!(result, vec![ExprVal::U64(18)],);
+        assert_eq!(result, vec![ExprVal::I64(18)],);
     }
 
     #[test]
     fn test_eval_rec_fun() {
         let source_code = "let rec fact x = if x > 0 then x * fact (x - 1) else 1 in fact 5;;";
         let result = interpret(source_code, false, false);
-        assert_eq!(result, vec![ExprVal::U64(120)],);
+        assert_eq!(result, vec![ExprVal::I64(120)],);
     }
 
     #[test]
     fn test_eval_list_pattern_matching() {
         let source_code = "let a = [1; 2; 3; 4; 5] in let rec len x = match x with | [] -> 0 | head::tail -> 1 + len tail in len a;;";
         let result = interpret(source_code, false, false);
-        assert_eq!(result, vec![ExprVal::U64(5)],);
+        assert_eq!(result, vec![ExprVal::I64(5)],);
     }
 
     #[test]

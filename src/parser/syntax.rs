@@ -12,7 +12,7 @@ pub enum BinOpKind {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Expr {
     Var(String),
-    U64(u64),
+    I64(i64),
     Bool(bool),
     Array(VecDeque<Expr>),
     BinOp(BinOpKind, Box<Expr>, Box<Expr>),
@@ -29,4 +29,10 @@ pub enum Pattern {
     Nil,
     Cons(String, String),
     Var(String),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum Type {
+    TyI64,
+    TyBool,
 }

@@ -2,7 +2,7 @@ pub mod lexer;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token {
-    Number(u64),
+    Number(i64),
     Identifier(String),
     True,
     False,

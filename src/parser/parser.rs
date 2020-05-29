@@ -300,7 +300,7 @@ impl<'a> Parser<'a> {
         self.next()
             .ok_or(ParseError::Eof)
             .and_then(|token| match token {
-                Token::Number(n) => Ok(Expr::U64(n)),
+                Token::Number(n) => Ok(Expr::I64(n)),
                 Token::Identifier(var) => Ok(Expr::Var(var)),
                 Token::True => Ok(Expr::Bool(true)),
                 Token::False => Ok(Expr::Bool(false)),

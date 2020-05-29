@@ -80,7 +80,7 @@ impl<'a> Lexer<'a> {
 
     fn lex_number(&mut self) -> Result<Token, LexError> {
         let number_literal = self.take_while(|b| b"0123456789".contains(&b));
-        let num = number_literal.parse::<u64>().unwrap();
+        let num = number_literal.parse::<i64>().unwrap();
         Ok(Token::Number(num))
     }
 
