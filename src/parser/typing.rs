@@ -1,5 +1,7 @@
-use crate::parser::syntax::{BinOpKind, Expr, Substitutions, Type, TypeEnv};
+use crate::parser::{BinOpKind, Expr, Substitutions, Type};
 use std::collections::{HashMap, VecDeque};
+
+pub type TypeEnv = HashMap<String, Type>;
 
 type Restrictions = VecDeque<(Type, Type)>;
 
@@ -144,38 +146,35 @@ impl<'a> Typer<'a> {
 mod tests {
     use crate::lexer::lexer::Lexer;
     use crate::parser::parser::Parser;
-    use crate::parser::typing::{Typer, TypeError};
+    use crate::parser::typing::{TypeError, Typer};
 
-    #[test]
-    fn typing_binary_operator1() {
-        let source_code = "a - b * 42 + 42;;";
+    fn typing_process(source_code: &str) -> Result<(), TypeError> {
         let mut lexer = Lexer::new(source_code);
         let tokens = lexer.lex().unwrap();
         let mut parser = Parser::new(tokens);
         let asts = parser.parse().unwrap();
         let mut typer = Typer::new(&asts);
-        assert_eq!(typer.infer_type(), Ok(()));
+        typer.infer_type()
+    }
+
+    #[test]
+    fn typing_binary_operator1() {
+        let source_code = "a - b * 42 + 42;;";
+        let result = typing_process(source_code);
+        assert_eq!(result, Ok(()));
     }
 
     #[test]
     fn typing_not_bound_variable() {
         let source_code = "x + 42;;";
-        let mut lexer = Lexer::new(source_code);
-        let tokens = lexer.lex().unwrap();
-        let mut parser = Parser::new(tokens);
-        let asts = parser.parse().unwrap();
-        let mut typer = Typer::new(&asts);
-        assert_eq!(typer.infer_type(), Err(TypeError::NotBound));
+        let result = typing_process(source_code);
+        assert_eq!(result, Err(TypeError::NotBound));
     }
 
     #[test]
     fn typing_function_definition() {
         let source_code = "fun x -> fun y -> x + y + 1;;";
-        let mut lexer = Lexer::new(source_code);
-        let tokens = lexer.lex().unwrap();
-        let mut parser = Parser::new(tokens);
-        let asts = parser.parse().unwrap();
-        let mut typer = Typer::new(&asts);
-        assert_eq!(typer.infer_type(), Ok(()));
+        let result = typing_process(source_code);
+        assert_eq!(result, Ok(()));
     }
 }

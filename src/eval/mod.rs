@@ -1,5 +1,5 @@
 pub mod eval;
-use crate::parser::syntax::Expr;
+use crate::parser::Expr;
 use std::collections::{HashMap, VecDeque};
 
 type Env = HashMap<String, ExprVal>;

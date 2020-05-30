@@ -1,5 +1,5 @@
 use crate::eval::{Env, EvalError, ExprVal};
-use crate::parser::syntax::{BinOpKind, Expr, Pattern};
+use crate::parser::{BinOpKind, Expr, Pattern};
 use std::collections::{HashMap, VecDeque};
 
 pub fn eval(vec_ast: &[Expr]) -> Result<Vec<ExprVal>, EvalError> {

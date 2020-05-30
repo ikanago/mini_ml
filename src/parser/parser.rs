@@ -1,5 +1,5 @@
 use crate::lexer::Token;
-use crate::parser::syntax::{BinOpKind, Expr, Pattern};
+use crate::parser::{BinOpKind, Expr, Pattern};
 use crate::parser::ParseError;
 use std::collections::VecDeque;
 
