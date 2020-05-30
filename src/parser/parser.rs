@@ -168,10 +168,7 @@ impl<'a> Parser<'a> {
                         Some(Token::Identifier(tail)) => tail,
                         _ => return Err(ParseError::UnexpectedToken),
                     };
-                    Pattern::Cons(
-                        head,
-                        tail.clone(),
-                    )
+                    Pattern::Cons(head, tail.clone())
                 }
                 _ => return Err(ParseError::UnexpectedToken),
             };

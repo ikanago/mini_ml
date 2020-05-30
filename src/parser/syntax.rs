@@ -45,7 +45,7 @@ pub enum Type {
 }
 
 impl Type {
-    fn get_free_type_vars(&self) -> HashSet<usize> {
+    pub fn get_free_type_vars(&self) -> HashSet<usize> {
         fn inner(ty: &Type, free_type_vars: &mut HashSet<usize>) {
             match &ty {
                 &Type::TyI64 => (),
@@ -64,7 +64,8 @@ impl Type {
         free_type_vars
     }
 
-    fn substitute_type(&self, substitutions: &Substitutions) -> Type {
+    /// Apply type substitution to self.
+    pub fn substitute_type(&self, substitutions: &Substitutions) -> Type {
         match &self {
             &Type::TyI64 => Type::TyI64,
             &Type::TyBool => Type::TyBool,
