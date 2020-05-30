@@ -1,1 +1,1 @@
-let rec f x = if x > 0 then x + f (x - 1) else 0 in f 3;;
+fun x -> fun y -> x + y + a;;

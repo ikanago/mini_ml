@@ -26,7 +26,7 @@ fn map_substitute(restrictions: &Restrictions, substitutions: &Substitutions) ->
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum TypeError {
-    DifferentType,
+    DifferentType(String),
     NotBound,
     ViolateOccurCheck,
 }
@@ -45,17 +45,18 @@ impl<'a> Typer<'a> {
         }
     }
 
-    pub fn infer_type(&self) -> Result<(), TypeError> {
+    pub fn infer_type(&mut self) -> Result<(), TypeError> {
         let mut env: HashMap<String, Type> = HashMap::new();
         env.insert("a".to_string(), Type::TyI64);
         env.insert("b".to_string(), Type::TyI64);
         for ast in self.vec_ast {
-            Self::typing_expression(ast, &mut env)?;
+            self.typing_expression(ast, &mut env)?;
         }
         Ok(())
     }
 
     fn typing_expression(
+        &mut self,
         expr: &Expr,
         environment: &mut TypeEnv,
     ) -> Result<(Substitutions, Type), TypeError> {
@@ -67,14 +68,24 @@ impl<'a> Typer<'a> {
             &Expr::I64(_) => Ok((vec![], Type::TyI64)),
             &Expr::Bool(_) => Ok((vec![], Type::TyBool)),
             &Expr::BinOp(op, lhs, rhs) => {
-                let (subst_l, lhs) = Self::typing_expression(lhs, environment)?;
-                let (subst_r, rhs) = Self::typing_expression(rhs, environment)?;
-                let (mut restrictions, binop_type) = Self::typing_operator(op.clone(), lhs, rhs)?;
+                let (subst_l, lhs) = self.typing_expression(lhs, environment)?;
+                let (subst_r, rhs) = self.typing_expression(rhs, environment)?;
+                let (mut restrictions, binop_type) = Self::typing_operator(op.clone(), lhs, rhs);
                 restrictions.append(&mut subst_to_restr(subst_l));
                 restrictions.append(&mut subst_to_restr(subst_r));
-                let unified_subst = Self::unify(&mut restrictions)?;
-                let binop_type = binop_type.substitute_type(&unified_subst);
+                let mut unified_subst = Self::unify(&mut restrictions)?;
+                let binop_type = binop_type.substitute_type(&mut unified_subst);
                 Ok((unified_subst, binop_type))
+            }
+            &Expr::Fun(arg, body) => {
+                let arg_type = self.fresh_type_var();
+                environment.insert(arg.clone(), arg_type.clone());
+                let (mut substitutions, body_type) = self.typing_expression(body, environment)?;
+                let arg_type = arg_type.substitute_type(&mut substitutions);
+                Ok((
+                    substitutions,
+                    Type::TyFun(Box::new(arg_type), Box::new(body_type)),
+                ))
             }
             _ => unimplemented!(),
         }
@@ -88,26 +99,13 @@ impl<'a> Typer<'a> {
         Type::TyVar(v)
     }
 
-    fn typing_operator(
-        op: BinOpKind,
-        lhs: Type,
-        rhs: Type,
-    ) -> Result<(Restrictions, Type), TypeError> {
+    fn typing_operator(op: BinOpKind, lhs: Type, rhs: Type) -> (Restrictions, Type) {
         let restrictions =
             VecDeque::from(vec![(lhs.clone(), Type::TyI64), (rhs.clone(), Type::TyI64)]);
         match op {
-            BinOpKind::Add => match (lhs, rhs) {
-                (Type::TyI64, Type::TyI64) => Ok((restrictions, Type::TyI64)),
-                _ => Err(TypeError::DifferentType),
-            },
-            BinOpKind::Sub => match (lhs, rhs) {
-                (Type::TyI64, Type::TyI64) => Ok((restrictions, Type::TyI64)),
-                _ => Err(TypeError::DifferentType),
-            },
-            BinOpKind::Mul => match (lhs, rhs) {
-                (Type::TyI64, Type::TyI64) => Ok((restrictions, Type::TyI64)),
-                _ => Err(TypeError::DifferentType),
-            },
+            BinOpKind::Add => (restrictions, Type::TyI64),
+            BinOpKind::Sub => (restrictions, Type::TyI64),
+            BinOpKind::Mul => (restrictions, Type::TyI64),
             _ => unimplemented!(),
         }
     }
@@ -128,16 +126,56 @@ impl<'a> Typer<'a> {
                     match free_type_vars.get(&ty_var) {
                         Some(_) => Err(TypeError::ViolateOccurCheck),
                         None => {
-                            let substitution = vec![(ty_var, ty.clone())];
-                            let mut restrictions: Restrictions =
-                                map_substitute(restrictions, &substitution);
-                            restrictions.push_back((Type::TyVar(ty_var), ty));
-                            Self::unify(&mut restrictions)
+                            let mut substitution = vec![(ty_var, ty.clone())];
+                            let mut restrictions = map_substitute(restrictions, &substitution);
+                            let mut rest_substitution = Self::unify(&mut restrictions)?;
+                            substitution.append(&mut rest_substitution);
+                            Ok(substitution)
                         }
                     }
                 }
-                _ => Err(TypeError::DifferentType),
+                _ => Err(TypeError::DifferentType("".to_string())),
             },
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::lexer::lexer::Lexer;
+    use crate::parser::parser::Parser;
+    use crate::parser::typing::{Typer, TypeError};
+
+    #[test]
+    fn typing_binary_operator1() {
+        let source_code = "a - b * 42 + 42;;";
+        let mut lexer = Lexer::new(source_code);
+        let tokens = lexer.lex().unwrap();
+        let mut parser = Parser::new(tokens);
+        let asts = parser.parse().unwrap();
+        let mut typer = Typer::new(&asts);
+        assert_eq!(typer.infer_type(), Ok(()));
+    }
+
+    #[test]
+    fn typing_not_bound_variable() {
+        let source_code = "x + 42;;";
+        let mut lexer = Lexer::new(source_code);
+        let tokens = lexer.lex().unwrap();
+        let mut parser = Parser::new(tokens);
+        let asts = parser.parse().unwrap();
+        let mut typer = Typer::new(&asts);
+        assert_eq!(typer.infer_type(), Err(TypeError::NotBound));
+    }
+
+    #[test]
+    fn typing_function_definition() {
+        let source_code = "fun x -> fun y -> x + y + 1;;";
+        let mut lexer = Lexer::new(source_code);
+        let tokens = lexer.lex().unwrap();
+        let mut parser = Parser::new(tokens);
+        let asts = parser.parse().unwrap();
+        let mut typer = Typer::new(&asts);
+        assert_eq!(typer.infer_type(), Ok(()));
     }
 }

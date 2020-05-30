@@ -70,13 +70,15 @@ impl Type {
             &Type::TyI64 => Type::TyI64,
             &Type::TyBool => Type::TyBool,
             &Type::TyVar(n) => {
-                let mut substituted_type = Type::TyVar(*n);
-                for (ty_var_count, ty) in substitutions {
-                    if n == ty_var_count {
-                        substituted_type = ty.clone();
-                    }
-                }
-                substituted_type.substitute_type(substitutions)
+                substitutions
+                    .iter()
+                    .fold(Type::TyVar(*n), |acc, (ty_var_count, ty)| {
+                        if n == ty_var_count {
+                            ty.clone().substitute_type(substitutions)
+                        } else {
+                            acc
+                        }
+                    })
             }
             &Type::TyFun(ty1, ty2) => {
                 let ty1 = ty1.substitute_type(substitutions);

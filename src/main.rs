@@ -28,8 +28,7 @@ fn main() -> std::io::Result<()> {
         let tokens = lexer.lex().unwrap();
         let mut parser = Parser::new(tokens);
         let asts = parser.parse().unwrap();
-        let typer = Typer::new(&asts);
-        // let result = interpret(source_code, dump_token, dump_ast);
+        let mut typer = Typer::new(&asts);
         println!("{:?}", typer.infer_type());
     } else if let Some(file) = matches.value_of("file") {
         let mut source_file = File::open(file)?;
