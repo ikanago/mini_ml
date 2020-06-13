@@ -1,1 +1,1 @@
-let f x = x * 2 in let g y = true in let a = 1 in f (g a);;
+let rec f x = if x > 0 then 1 + f (x - 1) else 0 in let x = 1 in f x;;

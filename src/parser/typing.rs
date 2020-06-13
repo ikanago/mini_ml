@@ -29,7 +29,7 @@ fn map_substitute(restrictions: &Restrictions, substitutions: &Substitutions) ->
 #[derive(Clone, Debug, PartialEq)]
 pub enum TypeError {
     DifferentType(String),
-    NotBound,
+    NotBound(String),
     ViolateOccurCheck,
 }
 
@@ -63,7 +63,7 @@ impl<'a> Typer<'a> {
         match &expr {
             &Expr::Var(var) => match environment.get(var) {
                 Some(var_type) => Ok((vec![], var_type.clone())),
-                None => Err(TypeError::NotBound),
+                None => Err(TypeError::NotBound(var.clone())),
             },
             &Expr::I64(_) => Ok((vec![], Type::TyI64)),
             &Expr::Bool(_) => Ok((vec![], Type::TyBool)),
@@ -82,6 +82,20 @@ impl<'a> Typer<'a> {
                 environment.insert(var.clone(), init);
                 let (_, body) = self.typing_expression(body, environment)?;
                 Ok((vec![], body))
+            }
+            &Expr::LetRec(var, arg, init, body) => {
+                let arg_type = self.fresh_type_var();
+                let dummy_init = Type::TyFun(
+                    Box::new(arg_type.clone()),
+                    Box::new(self.fresh_type_var()),
+                );
+                // environment.insert(arg.clone(), arg_type);
+                environment.insert(var.clone(), dummy_init);
+                let (_, init) = self.typing_expression(init, environment)?;
+                environment.remove(var);
+                environment.remove(arg);
+                environment.insert(var.clone(), init);
+                self.typing_expression(body, environment)
             }
             &Expr::If(cond, then, els) => {
                 let (subst_cond, cond) = self.typing_expression(cond, environment)?;
@@ -217,7 +231,7 @@ mod tests {
     fn typing_not_bound_variable() {
         let source_code = "let a = 1 in x + 42;;";
         let result = typing_process(source_code);
-        assert_eq!(result, Err(TypeError::NotBound));
+        assert_eq!(result, Err(TypeError::NotBound("x".to_string())));
     }
 
     #[test]
@@ -260,6 +274,13 @@ mod tests {
     #[test]
     fn typing_func_apply_as_type_variable() {
         let source_code = "let f x y = x y in let g z = z * 2 in f g 2;;";
+        let result = typing_process(source_code);
+        assert_eq!(result, Ok(()));
+    }
+
+    #[test]
+    fn typing_let_rec() {
+        let source_code = "let rec f x = if x > 0 then 1 + f (x - 1) else 0 in let x = 1 in f x;;";
         let result = typing_process(source_code);
         assert_eq!(result, Ok(()));
     }

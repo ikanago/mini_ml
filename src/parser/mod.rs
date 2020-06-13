@@ -23,7 +23,7 @@ pub enum Expr {
     Array(VecDeque<Expr>),
     BinOp(BinOpKind, Box<Expr>, Box<Expr>),
     Let(String, Box<Expr>, Box<Expr>),
-    LetRec(String, Box<Expr>, Box<Expr>),
+    LetRec(String, String, Box<Expr>, Box<Expr>),
     If(Box<Expr>, Box<Expr>, Box<Expr>),
     Match(Box<Expr>, Vec<(Pattern, Expr)>),
     Fun(String, Box<Expr>),

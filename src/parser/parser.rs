@@ -133,8 +133,13 @@ impl<'a> Parser<'a> {
         let body = self.parse_expr()?;
 
         if is_recursive {
+            let first_arg = match &initializer {
+                Expr::Fun(arg, _) => arg.clone(),
+                _ => unreachable!(),
+            };
             Ok(Expr::LetRec(
                 bound_var_name,
+                first_arg,
                 Box::new(initializer),
                 Box::new(body),
             ))

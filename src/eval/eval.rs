@@ -37,7 +37,7 @@ fn eval_expression(ast: &Expr, environment: &mut Env) -> Result<ExprVal, EvalErr
             environment.insert(var.clone(), init);
             eval_expression(body, environment)
         }
-        &Expr::LetRec(var, init, body) => {
+        &Expr::LetRec(var, arg, init, body) => {
             let init = match eval_expression(init, environment) {
                 Ok(ExprVal::Closure(arg, body, env)) => {
                     ExprVal::ClosureRec(var.clone(), arg, body, env)
