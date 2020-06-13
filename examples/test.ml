@@ -1,1 +1,1 @@
-let a = 1 in let b = 2 in a + b;;
+let f x = x * 2 in let g y = true in let a = 1 in f (g a);;

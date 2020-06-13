@@ -107,6 +107,28 @@ impl<'a> Typer<'a> {
                     Type::TyFun(Box::new(arg_type), Box::new(body_type)),
                 ))
             }
+            &Expr::Apply(fun, arg) => {
+                let (_, fun) = self.typing_expression(fun, environment)?;
+                let (_, arg) = self.typing_expression(arg, environment)?;
+                match fun.clone() {
+                    Type::TyFun(ty1, ty2) => {
+                        let mut restrictions = VecDeque::new();
+                        restrictions.push_back((arg, *ty1));
+                        let mut unified_subst = Self::unify(&mut restrictions)?;
+                        let apply_type = ty2.substitute_type(&mut unified_subst);
+                        Ok((unified_subst, apply_type))
+                    }
+                    // Case such as `let f x y = x y in ...`.
+                    Type::TyVar(ty_var) => Ok((
+                        vec![],
+                        Type::TyFun(Box::new(Type::TyVar(ty_var)), Box::new(arg)),
+                    )),
+                    _ => Err(TypeError::DifferentType(format!(
+                        "Expected function, but got {:?}",
+                        fun
+                    ))),
+                }
+            }
             _ => unimplemented!(),
         }
     }
@@ -219,5 +241,26 @@ mod tests {
         let source_code = "fun x -> fun y -> if x then if x > y then x + y else x - y else x * y;;";
         let result = typing_process(source_code);
         assert_eq!(result, Err(TypeError::DifferentType("".to_string())));
+    }
+
+    #[test]
+    fn typing_func_apply() {
+        let source_code = "let f x = x * 2 in let g y = y + 3 in let a = 1 in f (g a);;";
+        let result = typing_process(source_code);
+        assert_eq!(result, Ok(()));
+    }
+
+    #[test]
+    fn typing_invalid_func_apply() {
+        let source_code = "let f x = x * 2 in let g y = false in let a = 1 in f (g a);;";
+        let result = typing_process(source_code);
+        assert_eq!(result, Err(TypeError::DifferentType("".to_string())));
+    }
+
+    #[test]
+    fn typing_func_apply_as_type_variable() {
+        let source_code = "let f x y = x y in let g z = z * 2 in f g 2;;";
+        let result = typing_process(source_code);
+        assert_eq!(result, Ok(()));
     }
 }
