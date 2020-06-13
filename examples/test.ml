@@ -1,1 +1,1 @@
-fun x -> fun y -> if x < y then if x > y then x + y else x - y else x * y;;
+let a = 1 in let b = 2 in a + b;;

@@ -49,8 +49,6 @@ impl<'a> Typer<'a> {
 
     pub fn infer_type(&mut self) -> Result<(), TypeError> {
         let mut env: HashMap<String, Type> = HashMap::new();
-        env.insert("a".to_string(), Type::TyI64);
-        env.insert("b".to_string(), Type::TyI64);
         for ast in self.vec_ast {
             self.typing_expression(ast, &mut env)?;
         }
@@ -78,6 +76,12 @@ impl<'a> Typer<'a> {
                 let mut unified_subst = Self::unify(&mut restrictions)?;
                 let binop_type = binop_type.substitute_type(&mut unified_subst);
                 Ok((unified_subst, binop_type))
+            }
+            &Expr::Let(var, init, body) => {
+                let (_, init) = self.typing_expression(init, environment)?;
+                environment.insert(var.clone(), init);
+                let (_, body) = self.typing_expression(body, environment)?;
+                Ok((vec![], body))
             }
             &Expr::If(cond, then, els) => {
                 let (subst_cond, cond) = self.typing_expression(cond, environment)?;
@@ -174,20 +178,6 @@ mod tests {
     }
 
     #[test]
-    fn typing_binary_operator1() {
-        let source_code = "a - b * 42 + 42;;";
-        let result = typing_process(source_code);
-        assert_eq!(result, Ok(()));
-    }
-
-    #[test]
-    fn typing_not_bound_variable() {
-        let source_code = "x + 42;;";
-        let result = typing_process(source_code);
-        assert_eq!(result, Err(TypeError::NotBound));
-    }
-
-    #[test]
     fn typing_function_definition() {
         let source_code = "fun x -> fun y -> x + y + 1;;";
         let result = typing_process(source_code);
@@ -195,29 +185,39 @@ mod tests {
     }
 
     #[test]
-    fn typing_if_else() {
-        let source_code = "fun x -> fun y -> if x < y then if x > y then x + y else x - y else x * y;;";
+    fn typing_let() {
+        let source_code = "let a = 1 in let b = 2 in a + b * 3;;";
         let result = typing_process(source_code);
         assert_eq!(result, Ok(()));
     }
 
     #[test]
-    #[should_panic]
-    fn typing_different_type_if_body() {
-        let source_code = "fun x -> fun y -> if x < y then if x > y then x + y else true else x * y;;";
-        match typing_process(source_code) {
-            Ok(()) => (),
-            Err(err) => panic!(err),
-        };
+    fn typing_not_bound_variable() {
+        let source_code = "let a = 1 in x + 42;;";
+        let result = typing_process(source_code);
+        assert_eq!(result, Err(TypeError::NotBound));
     }
 
     #[test]
-    #[should_panic]
+    fn typing_if_else() {
+        let source_code =
+            "fun x -> fun y -> if x < y then if x > y then x + y else x - y else x * y;;";
+        let result = typing_process(source_code);
+        assert_eq!(result, Ok(()));
+    }
+
+    #[test]
+    fn typing_different_type_if_body() {
+        let source_code =
+            "fun x -> fun y -> if x < y then if x > y then x + y else true else x * y;;";
+        let result = typing_process(source_code);
+        assert_eq!(result, Err(TypeError::DifferentType("".to_string())));
+    }
+
+    #[test]
     fn typing_invalid_if_condition() {
         let source_code = "fun x -> fun y -> if x then if x > y then x + y else x - y else x * y;;";
-        match typing_process(source_code) {
-            Ok(()) => (),
-            Err(err) => panic!(err),
-        };
+        let result = typing_process(source_code);
+        assert_eq!(result, Err(TypeError::DifferentType("".to_string())));
     }
 }

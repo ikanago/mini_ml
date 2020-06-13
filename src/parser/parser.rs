@@ -1,6 +1,6 @@
 use crate::lexer::Token;
-use crate::parser::{BinOpKind, Expr, Pattern};
 use crate::parser::ParseError;
+use crate::parser::{BinOpKind, Expr, Pattern};
 use std::collections::VecDeque;
 
 ///Specify caller of `Parser::parse_multi_args_fun`.
