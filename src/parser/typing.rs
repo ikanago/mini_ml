@@ -79,13 +79,27 @@ impl<'a> Typer<'a> {
                 let binop_type = binop_type.substitute_type(&mut unified_subst);
                 Ok((unified_subst, binop_type))
             }
+            &Expr::If(cond, then, els) => {
+                let (subst_cond, cond) = self.typing_expression(cond, environment)?;
+                let (subst_then, then) = self.typing_expression(then, environment)?;
+                let (subst_els, els) = self.typing_expression(els, environment)?;
+                let mut restrictions = VecDeque::new();
+                restrictions.append(&mut subst_to_restr(subst_cond));
+                restrictions.append(&mut subst_to_restr(subst_then));
+                restrictions.append(&mut subst_to_restr(subst_els));
+                restrictions.push_back((cond, Type::TyBool));
+                restrictions.push_back((then.clone(), els));
+                let mut unified_subst = Self::unify(&mut restrictions)?;
+                let if_body_type = then.substitute_type(&mut unified_subst);
+                Ok((unified_subst, if_body_type))
+            }
             &Expr::Fun(arg, body) => {
                 let arg_type = self.fresh_type_var();
                 environment.insert(arg.clone(), arg_type.clone());
-                let (mut substitutions, body_type) = self.typing_expression(body, environment)?;
-                let arg_type = arg_type.substitute_type(&mut substitutions);
+                let (mut subst_body, body_type) = self.typing_expression(body, environment)?;
+                let arg_type = arg_type.substitute_type(&mut subst_body);
                 Ok((
-                    substitutions,
+                    subst_body,
                     Type::TyFun(Box::new(arg_type), Box::new(body_type)),
                 ))
             }
@@ -108,7 +122,8 @@ impl<'a> Typer<'a> {
             BinOpKind::Add => (restrictions, Type::TyI64),
             BinOpKind::Sub => (restrictions, Type::TyI64),
             BinOpKind::Mul => (restrictions, Type::TyI64),
-            _ => unimplemented!(),
+            BinOpKind::Lt => (restrictions, Type::TyBool),
+            BinOpKind::Gt => (restrictions, Type::TyBool),
         }
     }
 
@@ -148,6 +163,7 @@ mod tests {
     use crate::parser::parser::Parser;
     use crate::parser::typing::{TypeError, Typer};
 
+    /// Parse source code and check if type inference is done successfully.
     fn typing_process(source_code: &str) -> Result<(), TypeError> {
         let mut lexer = Lexer::new(source_code);
         let tokens = lexer.lex().unwrap();
@@ -176,5 +192,32 @@ mod tests {
         let source_code = "fun x -> fun y -> x + y + 1;;";
         let result = typing_process(source_code);
         assert_eq!(result, Ok(()));
+    }
+
+    #[test]
+    fn typing_if_else() {
+        let source_code = "fun x -> fun y -> if x < y then if x > y then x + y else x - y else x * y;;";
+        let result = typing_process(source_code);
+        assert_eq!(result, Ok(()));
+    }
+
+    #[test]
+    #[should_panic]
+    fn typing_different_type_if_body() {
+        let source_code = "fun x -> fun y -> if x < y then if x > y then x + y else true else x * y;;";
+        match typing_process(source_code) {
+            Ok(()) => (),
+            Err(err) => panic!(err),
+        };
+    }
+
+    #[test]
+    #[should_panic]
+    fn typing_invalid_if_condition() {
+        let source_code = "fun x -> fun y -> if x then if x > y then x + y else x - y else x * y;;";
+        match typing_process(source_code) {
+            Ok(()) => (),
+            Err(err) => panic!(err),
+        };
     }
 }

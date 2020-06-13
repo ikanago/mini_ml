@@ -1,1 +1,1 @@
-fun x -> fun y -> x + y + a;;
+fun x -> fun y -> if x < y then if x > y then x + y else x - y else x * y;;
