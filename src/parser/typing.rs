@@ -37,6 +37,7 @@ pub struct Typer<'a> {
     // Represent next type variable.
     counter: usize,
     vec_ast: &'a Vec<Expr>,
+    environment: TypeEnv,
 }
 
 impl<'a> Typer<'a> {
@@ -44,115 +45,55 @@ impl<'a> Typer<'a> {
         Self {
             counter: 0,
             vec_ast,
+            environment: TypeEnv::new(),
         }
     }
 
     pub fn infer_type(&mut self) -> Result<(), TypeError> {
-        let mut env: HashMap<String, Type> = HashMap::new();
         for ast in self.vec_ast {
-            self.typing_expression(ast, &mut env)?;
+            self.typing_expression(ast)?;
+            self.environment = TypeEnv::new();
         }
         Ok(())
     }
 
-    fn typing_expression(
-        &mut self,
-        expr: &Expr,
-        environment: &mut TypeEnv,
-    ) -> Result<(Substitutions, Type), TypeError> {
+    fn typing_expression(&mut self, expr: &Expr) -> Result<(Substitutions, Type), TypeError> {
         match &expr {
-            &Expr::Var(var) => match environment.get(var) {
-                Some(var_type) => Ok((vec![], var_type.clone())),
-                None => Err(TypeError::NotBound(var.clone())),
-            },
+            &Expr::Var(var) => self.typing_var(var),
             &Expr::I64(_) => Ok((vec![], Type::TyI64)),
             &Expr::Bool(_) => Ok((vec![], Type::TyBool)),
-            &Expr::BinOp(op, lhs, rhs) => {
-                let (subst_l, lhs) = self.typing_expression(lhs, environment)?;
-                let (subst_r, rhs) = self.typing_expression(rhs, environment)?;
-                let (mut restrictions, binop_type) = Self::typing_operator(op.clone(), lhs, rhs);
-                restrictions.append(&mut subst_to_restr(subst_l));
-                restrictions.append(&mut subst_to_restr(subst_r));
-                let mut unified_subst = Self::unify(&mut restrictions)?;
-                let binop_type = binop_type.substitute_type(&mut unified_subst);
-                Ok((unified_subst, binop_type))
-            }
-            &Expr::Let(var, init, body) => {
-                let (_, init) = self.typing_expression(init, environment)?;
-                environment.insert(var.clone(), init);
-                let (_, body) = self.typing_expression(body, environment)?;
-                Ok((vec![], body))
-            }
-            &Expr::LetRec(var, arg, init, body) => {
-                let arg_type = self.fresh_type_var();
-                let dummy_init = Type::TyFun(
-                    Box::new(arg_type.clone()),
-                    Box::new(self.fresh_type_var()),
-                );
-                // environment.insert(arg.clone(), arg_type);
-                environment.insert(var.clone(), dummy_init);
-                let (_, init) = self.typing_expression(init, environment)?;
-                environment.remove(var);
-                environment.remove(arg);
-                environment.insert(var.clone(), init);
-                self.typing_expression(body, environment)
-            }
-            &Expr::If(cond, then, els) => {
-                let (subst_cond, cond) = self.typing_expression(cond, environment)?;
-                let (subst_then, then) = self.typing_expression(then, environment)?;
-                let (subst_els, els) = self.typing_expression(els, environment)?;
-                let mut restrictions = VecDeque::new();
-                restrictions.append(&mut subst_to_restr(subst_cond));
-                restrictions.append(&mut subst_to_restr(subst_then));
-                restrictions.append(&mut subst_to_restr(subst_els));
-                restrictions.push_back((cond, Type::TyBool));
-                restrictions.push_back((then.clone(), els));
-                let mut unified_subst = Self::unify(&mut restrictions)?;
-                let if_body_type = then.substitute_type(&mut unified_subst);
-                Ok((unified_subst, if_body_type))
-            }
-            &Expr::Fun(arg, body) => {
-                let arg_type = self.fresh_type_var();
-                environment.insert(arg.clone(), arg_type.clone());
-                let (mut subst_body, body_type) = self.typing_expression(body, environment)?;
-                let arg_type = arg_type.substitute_type(&mut subst_body);
-                Ok((
-                    subst_body,
-                    Type::TyFun(Box::new(arg_type), Box::new(body_type)),
-                ))
-            }
-            &Expr::Apply(fun, arg) => {
-                let (_, fun) = self.typing_expression(fun, environment)?;
-                let (_, arg) = self.typing_expression(arg, environment)?;
-                match fun.clone() {
-                    Type::TyFun(ty1, ty2) => {
-                        let mut restrictions = VecDeque::new();
-                        restrictions.push_back((arg, *ty1));
-                        let mut unified_subst = Self::unify(&mut restrictions)?;
-                        let apply_type = ty2.substitute_type(&mut unified_subst);
-                        Ok((unified_subst, apply_type))
-                    }
-                    // Case such as `let f x y = x y in ...`.
-                    Type::TyVar(ty_var) => Ok((
-                        vec![],
-                        Type::TyFun(Box::new(Type::TyVar(ty_var)), Box::new(arg)),
-                    )),
-                    _ => Err(TypeError::DifferentType(format!(
-                        "Expected function, but got {:?}",
-                        fun
-                    ))),
-                }
-            }
+            &Expr::BinOp(op, lhs, rhs) => self.typing_binop(op, lhs, rhs),
+            &Expr::Let(var, init, body) => self.typing_let(var, init, body),
+            &Expr::LetRec(var, arg, init, body) => self.typing_let_rec(var, arg, init, body),
+
+            &Expr::If(cond, then, els) => self.typing_if(cond, then, els),
+            &Expr::Fun(arg, body) => self.typing_fun(arg, body),
+            &Expr::Apply(fun, arg) => self.typing_apply_fun(fun, arg),
             _ => unimplemented!(),
         }
     }
 
-    // When called, return new type variable with current counter value
-    // and increment counter.
-    fn fresh_type_var(&mut self) -> Type {
-        let v = self.counter;
-        self.counter += 1;
-        Type::TyVar(v)
+    fn typing_var(&mut self, var: &str) -> Result<(Substitutions, Type), TypeError> {
+        match self.environment.get(var) {
+            Some(var_type) => Ok((vec![], var_type.clone())),
+            None => Err(TypeError::NotBound(var.to_string())),
+        }
+    }
+
+    fn typing_binop(
+        &mut self,
+        op: &BinOpKind,
+        lhs: &Box<Expr>,
+        rhs: &Box<Expr>,
+    ) -> Result<(Substitutions, Type), TypeError> {
+        let (subst_l, lhs) = self.typing_expression(lhs)?;
+        let (subst_r, rhs) = self.typing_expression(rhs)?;
+        let (mut restrictions, binop_type) = Self::typing_operator(op.clone(), lhs, rhs);
+        restrictions.append(&mut subst_to_restr(subst_l));
+        restrictions.append(&mut subst_to_restr(subst_r));
+        let mut unified_subst = Self::unify(&mut restrictions)?;
+        let binop_type = binop_type.substitute_type(&mut unified_subst);
+        Ok((unified_subst, binop_type))
     }
 
     fn typing_operator(op: BinOpKind, lhs: Type, rhs: Type) -> (Restrictions, Type) {
@@ -165,6 +106,106 @@ impl<'a> Typer<'a> {
             BinOpKind::Lt => (restrictions, Type::TyBool),
             BinOpKind::Gt => (restrictions, Type::TyBool),
         }
+    }
+
+    fn typing_let(
+        &mut self,
+        var: &str,
+        init: &Box<Expr>,
+        body: &Box<Expr>,
+    ) -> Result<(Substitutions, Type), TypeError> {
+        let (_, init) = self.typing_expression(init)?;
+        self.environment.insert(var.to_string(), init);
+        let (_, body) = self.typing_expression(body)?;
+        Ok((vec![], body))
+    }
+
+    fn typing_let_rec(
+        &mut self,
+        var: &str,
+        arg: &str,
+        init: &Box<Expr>,
+        body: &Box<Expr>,
+    ) -> Result<(Substitutions, Type), TypeError> {
+        let arg_type = self.fresh_type_var();
+        let dummy_init = Type::TyFun(Box::new(arg_type.clone()), Box::new(self.fresh_type_var()));
+        // environment.insert(arg.clone(), arg_type);
+        self.environment.insert(var.to_string(), dummy_init);
+        let (_, init) = self.typing_expression(init)?;
+        self.environment.remove(var);
+        self.environment.remove(arg);
+        self.environment.insert(var.to_string(), init);
+        self.typing_expression(body)
+    }
+
+    fn typing_if(
+        &mut self,
+        cond: &Box<Expr>,
+        then: &Box<Expr>,
+        els: &Box<Expr>,
+    ) -> Result<(Substitutions, Type), TypeError> {
+        let (subst_cond, cond) = self.typing_expression(cond)?;
+        let (subst_then, then) = self.typing_expression(then)?;
+        let (subst_els, els) = self.typing_expression(els)?;
+        let mut restrictions = VecDeque::new();
+        restrictions.append(&mut subst_to_restr(subst_cond));
+        restrictions.append(&mut subst_to_restr(subst_then));
+        restrictions.append(&mut subst_to_restr(subst_els));
+        restrictions.push_back((cond, Type::TyBool));
+        restrictions.push_back((then.clone(), els));
+        let mut unified_subst = Self::unify(&mut restrictions)?;
+        let if_body_type = then.substitute_type(&mut unified_subst);
+        Ok((unified_subst, if_body_type))
+    }
+
+    fn typing_fun(
+        &mut self,
+        arg: &str,
+        body: &Box<Expr>,
+    ) -> Result<(Substitutions, Type), TypeError> {
+        let arg_type = self.fresh_type_var();
+        self.environment.insert(arg.to_string(), arg_type.clone());
+        let (mut subst_body, body_type) = self.typing_expression(body)?;
+        let arg_type = arg_type.substitute_type(&mut subst_body);
+        Ok((
+            subst_body,
+            Type::TyFun(Box::new(arg_type), Box::new(body_type)),
+        ))
+    }
+
+    fn typing_apply_fun(
+        &mut self,
+        fun: &Box<Expr>,
+        arg: &Box<Expr>,
+    ) -> Result<(Substitutions, Type), TypeError> {
+        let (_, fun) = self.typing_expression(fun)?;
+        let (_, arg) = self.typing_expression(arg)?;
+        match fun.clone() {
+            Type::TyFun(ty1, ty2) => {
+                let mut restrictions = VecDeque::new();
+                restrictions.push_back((arg, *ty1));
+                let mut unified_subst = Self::unify(&mut restrictions)?;
+                let apply_type = ty2.substitute_type(&mut unified_subst);
+                Ok((unified_subst, apply_type))
+            }
+            // Case such as `let f x y = x y in ...`.
+            Type::TyVar(ty_var) => Ok((
+                vec![],
+                Type::TyFun(Box::new(Type::TyVar(ty_var)), Box::new(arg)),
+            )),
+            _ => Err(TypeError::DifferentType(format!(
+                "Expected function, but got {:?}",
+                fun
+            ))),
+        }
+    }
+
+    // When called, return new type variable with current counter value
+    // and increment counter.
+    fn fresh_type_var(&mut self) -> Type {
+        let v = self.counter;
+        self.counter += 1;
+        Type::TyVar(v)
     }
 
     /// Solve unification problem on given type restrictions and return substitutions as a solution.
