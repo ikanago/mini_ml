@@ -1,1 +1,1 @@
-let rec f x = if x > 0 then 1 + f (x - 1) else 0 in let x = 1 in f x;;
+let rec f x = if x > 0 then 1 + f (x - 1) else 0 in let x = 5 in f x;;

@@ -148,15 +148,19 @@ mod tests {
     }
 
     #[test]
-    fn test_eval_fun() {
+    fn test_eval_fun1() {
         let source_code = "let apply = fun f -> fun x -> fun y -> if x < y then f x + y else f x * y in apply (fun x -> x + 1) 5 3;;";
         let result = interpret(source_code, false, false);
         assert_eq!(result, vec![ExprVal::I64(18)],);
-
+    }
+    #[test]
+    fn test_eval_fun2() {
         let source_code = "let apply = fun f x y -> if x < y then f x + y else f x * y in apply (fun x -> x + 1) 5 3;;";
         let result = interpret(source_code, false, false);
         assert_eq!(result, vec![ExprVal::I64(18)],);
-
+    }
+    #[test]
+    fn test_eval_fun3() {
         let source_code =
             "let apply f x y = if x < y then f x + y else f x * y in apply (fun x -> x + 1) 5 3;;";
         let result = interpret(source_code, false, false);
@@ -172,9 +176,16 @@ mod tests {
 
     #[test]
     fn test_eval_list_pattern_matching() {
-        let source_code = "let a = [1; 2; 3; 4; 5] in let rec len x = match x with | [] -> 0 | head::tail -> 1 + len tail in len a;;";
+        let source_code = "let a = 1 :: 2 :: 3 :: 4 :: 5 :: [] in let rec len x = match x with | [] -> 0 | head::tail -> 1 + len tail in len a;;";
         let result = interpret(source_code, false, false);
         assert_eq!(result, vec![ExprVal::I64(5)],);
+    }
+
+    #[test]
+    fn test_eval_list_pattern_matching_more_cons() {
+        let source_code = "let rec max l = match l with | x :: [] -> x | x :: y :: z -> if x < y then max (y :: z) else max (x :: z) in max [1; 2; 4; 2; 5; 9; 3;];;";
+        let result = interpret(source_code, false, false);
+        assert_eq!(result, vec![ExprVal::I64(9)],);
     }
 
     #[test]

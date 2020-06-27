@@ -102,8 +102,7 @@ impl<'a> Typer<'a> {
             }
             Type::TyVar(n) => {
                 let list_type = Type::TyList(Box::new(lhs));
-                let mut restrictions =
-                    VecDeque::from(vec![(Type::TyVar(n), list_type.clone())]);
+                let mut restrictions = VecDeque::from(vec![(Type::TyVar(n), list_type.clone())]);
                 let unified_subst = Self::unify(&mut restrictions)?;
                 Ok((unified_subst, list_type))
             }
@@ -120,11 +119,9 @@ impl<'a> Typer<'a> {
         lhs: &Box<Expr>,
         rhs: &Box<Expr>,
     ) -> Result<(Substitutions, Type), TypeError> {
-        let (subst_l, lhs) = self.typing_expression(lhs)?;
-        let (subst_r, rhs) = self.typing_expression(rhs)?;
+        let (_, lhs) = self.typing_expression(lhs)?;
+        let (_, rhs) = self.typing_expression(rhs)?;
         let (mut restrictions, binop_type) = Self::typing_operator(op.clone(), lhs, rhs);
-        restrictions.append(&mut subst_to_restr(subst_l));
-        restrictions.append(&mut subst_to_restr(subst_r));
         let mut unified_subst = Self::unify(&mut restrictions)?;
         let binop_type = binop_type.substitute_type(&mut unified_subst);
         Ok((unified_subst, binop_type))
@@ -281,21 +278,30 @@ impl<'a> Typer<'a> {
         fun: &Box<Expr>,
         arg: &Box<Expr>,
     ) -> Result<(Substitutions, Type), TypeError> {
-        let (_, fun) = self.typing_expression(fun)?;
-        let (_, arg) = self.typing_expression(arg)?;
+        let (subst_fun, fun) = self.typing_expression(fun)?;
+        let (subst_arg, arg) = self.typing_expression(arg)?;
         match fun.clone() {
             Type::TyFun(ty1, ty2) => {
                 let mut restrictions = VecDeque::new();
                 restrictions.push_back((arg, *ty1));
+                restrictions.append(&mut subst_to_restr(subst_fun));
+                restrictions.append(&mut subst_to_restr(subst_arg));
                 let mut unified_subst = Self::unify(&mut restrictions)?;
                 let apply_type = ty2.substitute_type(&mut unified_subst);
                 Ok((unified_subst, apply_type))
             }
             // Case such as `let f x y = x y in ...`.
-            Type::TyVar(ty_var) => Ok((
-                vec![],
-                Type::TyFun(Box::new(Type::TyVar(ty_var)), Box::new(arg)),
-            )),
+            Type::TyVar(ty_var) => {
+                let mut restrictions = VecDeque::new();
+                let apply_type = self.fresh_type_var();
+                restrictions.push_back((Type::TyVar(ty_var), Type::TyFun(Box::new(arg), Box::new(apply_type.clone()))));
+                let mut unified_subst = Self::unify(&mut restrictions)?;
+                let apply_type = apply_type.substitute_type(&mut unified_subst);
+                Ok((
+                    unified_subst,
+                    apply_type,
+                ))
+            }
             _ => Err(TypeError::DifferentType(format!(
                 "Expected function, but got {:?}",
                 fun
@@ -334,6 +340,10 @@ impl<'a> Typer<'a> {
                             Ok(substitution)
                         }
                     }
+                }
+                (Type::TyList(ty1), Type::TyList(ty2)) => {
+                    restrictions.push_back((*ty1, *ty2));
+                    Self::unify(restrictions)
                 }
                 _ => Err(TypeError::DifferentType(format!("{:?}, {:?}", ty1, ty2))),
             },
@@ -399,14 +409,20 @@ mod tests {
         let source_code =
             "fun x -> fun y -> if x < y then if x > y then x + y else true else x * y;;";
         let result = typing_process(source_code);
-        assert_eq!(result, Err(TypeError::DifferentType("".to_string())));
+        assert_eq!(
+            result,
+            Err(TypeError::DifferentType("TyI64, TyBool".to_string()))
+        );
     }
 
     #[test]
     fn typing_invalid_if_condition() {
         let source_code = "fun x -> fun y -> if x then if x > y then x + y else x - y else x * y;;";
         let result = typing_process(source_code);
-        assert_eq!(result, Err(TypeError::DifferentType("".to_string())));
+        assert_eq!(
+            result,
+            Err(TypeError::DifferentType("TyI64, TyBool".to_string()))
+        );
     }
 
     #[test]
@@ -420,7 +436,10 @@ mod tests {
     fn typing_invalid_func_apply() {
         let source_code = "let f x = x * 2 in let g y = false in let a = 1 in f (g a);;";
         let result = typing_process(source_code);
-        assert_eq!(result, Err(TypeError::DifferentType("".to_string())));
+        assert_eq!(
+            result,
+            Err(TypeError::DifferentType("TyBool, TyI64".to_string()))
+        );
     }
 
     #[test]
