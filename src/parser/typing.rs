@@ -65,7 +65,6 @@ impl<'a> Typer<'a> {
             &Expr::Bool(_) => Ok((vec![], Type::TyBool)),
             &Expr::Nil => self.typing_nil(),
             &Expr::Cons(lhs, rhs) => self.typing_cons(lhs, rhs),
-            &Expr::Array(elements) => self.typing_array(elements),
             &Expr::BinOp(op, lhs, rhs) => self.typing_binop(op, lhs, rhs),
             &Expr::Let(var, init, body) => self.typing_let(var, init, body),
             &Expr::LetRec(var, arg, init, body) => self.typing_let_rec(var, arg, init, body),
@@ -85,33 +84,34 @@ impl<'a> Typer<'a> {
 
     fn typing_nil(&mut self) -> Result<(Substitutions, Type), TypeError> {
         let ty_var = self.fresh_type_var();
-        Ok((vec![], Type::TyArray(Box::new(ty_var))))
+        Ok((vec![], Type::TyList(Box::new(ty_var))))
     }
 
-    fn typing_cons(&mut self, lhs: &Box<Expr>, rhs: &Box<Expr>) -> Result<(Substitutions, Type), TypeError> {
+    fn typing_cons(
+        &mut self,
+        lhs: &Box<Expr>,
+        rhs: &Box<Expr>,
+    ) -> Result<(Substitutions, Type), TypeError> {
         let (_, lhs) = self.typing_expression(lhs)?;
         let (_, rhs) = self.typing_expression(rhs)?;
         match rhs {
-            Type::TyArray(ty) => {
+            Type::TyList(ty) => {
                 let mut restrictions = VecDeque::from(vec![(lhs.clone(), *ty)]);
                 let unified_subst = Self::unify(&mut restrictions)?;
-                Ok((unified_subst, Type::TyArray(Box::new(lhs))))
+                Ok((unified_subst, Type::TyList(Box::new(lhs))))
             }
-            _ => Err(TypeError::DifferentType("Expected array".to_string()))
+            Type::TyVar(n) => {
+                let list_type = Type::TyList(Box::new(lhs));
+                let mut restrictions =
+                    VecDeque::from(vec![(Type::TyVar(n), list_type.clone())]);
+                let unified_subst = Self::unify(&mut restrictions)?;
+                Ok((unified_subst, list_type))
+            }
+            _ => Err(TypeError::DifferentType(format!(
+                "Expected array but got {:?}",
+                rhs
+            ))),
         }
-    }
-
-    fn typing_array(&mut self, elements: &VecDeque<Expr>) -> Result<(Substitutions, Type), TypeError> {
-        let (_, first_element_type) = self.typing_expression(elements.front().unwrap())?;
-        let elements_type = elements.iter().fold(Ok(first_element_type), |acc, element| {
-            let (_, element_type) = self.typing_expression(element)?;
-            if acc.unwrap() == element_type {
-                Ok(element_type)
-            } else {
-                Err(TypeError::DifferentType("".to_string()))
-            }
-        })?;
-        Ok((vec![], Type::TyArray(Box::new(elements_type))))
     }
 
     fn typing_binop(
@@ -201,37 +201,64 @@ impl<'a> Typer<'a> {
         self.typing_match_pattern_array(cond, patterns)
     }
 
-    fn typing_match_pattern_array(&mut self, cond_type: Type, patterns: &Vec<(Expr, Expr)>) -> Result<(Substitutions, Type), TypeError> {
+    fn typing_match_pattern_array(
+        &mut self,
+        cond_type: Type,
+        patterns: &Vec<(Expr, Expr)>,
+    ) -> Result<(Substitutions, Type), TypeError> {
         let mut restrictions = Restrictions::new();
-        let mut arm_type_nil = Type::TyI64;
-        let mut arm_type_cons = Type::TyI64;
+        let mut arm_types = Vec::new();
         for (pattern, arm) in patterns.iter() {
-            match pattern.clone() {
-                Expr::Nil => {
+            let arm_type = self.match_patterns(&cond_type, pattern, arm, &mut restrictions)?;
+            arm_types.push(arm_type);
+        }
+        if arm_types.len() < 2 {
+            return Err(TypeError::DifferentType("".to_string()));
+        }
+        let arm_restrictions = vec_to_tuples(&arm_types);
+        restrictions.append(&mut VecDeque::from(arm_restrictions));
+        let unified_subst = Self::unify(&mut restrictions)?;
+        Ok((unified_subst, arm_types.first().unwrap().clone()))
+    }
+
+    fn match_patterns(
+        &mut self,
+        cond_type: &Type,
+        pattern: &Expr,
+        arm: &Expr,
+        restrictions: &mut Restrictions,
+    ) -> Result<Type, TypeError> {
+        match pattern.clone() {
+            Expr::Nil => {
+                let (arm_subst, arm) = self.typing_expression(arm)?;
+                restrictions.append(&mut subst_to_restr(arm_subst));
+                Ok(arm)
+            }
+            Expr::Cons(head, tail) => match (*head, *tail) {
+                (Expr::Var(head), Expr::Var(tail)) => {
+                    let head_type = self.fresh_type_var();
+                    self.environment.insert(head, head_type);
+                    self.environment.insert(tail, cond_type.clone());
                     let (arm_subst, arm) = self.typing_expression(arm)?;
                     restrictions.append(&mut subst_to_restr(arm_subst));
-                    arm_type_nil = arm;
-                },
-                Expr::Cons(head, tail) => {
-                    match (*head, *tail) {
-                        (Expr::Var(head), Expr::Var(tail)) => {
-                            self.environment.insert(head, cond_type.clone());
-                            self.environment.insert(tail, Type::TyArray(Box::new(cond_type.clone())));
-                        }
-                        _ => return Err(TypeError::DifferentType("".to_string()))
-                    }
+                    Ok(arm)
+                }
+                (Expr::Var(head), Expr::Nil) => {
+                    let head_type = self.fresh_type_var();
+                    self.environment.insert(head, head_type);
                     let (arm_subst, arm) = self.typing_expression(arm)?;
                     restrictions.append(&mut subst_to_restr(arm_subst));
-                    arm_type_cons = arm;
+                    Ok(arm)
+                }
+                (Expr::Var(head), Expr::Cons(x, y)) => {
+                    let head_type = self.fresh_type_var();
+                    self.environment.insert(head, head_type);
+                    self.match_patterns(cond_type, &Expr::Cons(x, y), arm, restrictions)
                 }
                 _ => unimplemented!(),
-            }
+            },
+            _ => unimplemented!(),
         }
-        restrictions.push_back((arm_type_nil.clone(), arm_type_cons.clone()));
-        let mut unified_subst = Self::unify(&mut restrictions)?;
-        arm_type_nil.substitute_type(&mut unified_subst);
-        let arm_type_cons = arm_type_cons.substitute_type(&mut unified_subst);
-        Ok((unified_subst, arm_type_cons))
     }
 
     fn typing_fun(
@@ -289,7 +316,7 @@ impl<'a> Typer<'a> {
         match restrictions.pop_front() {
             None => Ok(Substitutions::new()),
             Some((ty1, ty2)) if ty1 == ty2 => Self::unify(restrictions),
-            Some((ty1, ty2)) => match (ty1, ty2) {
+            Some((ty1, ty2)) => match (ty1.clone(), ty2.clone()) {
                 (Type::TyFun(arg1, body1), Type::TyFun(arg2, body2)) => {
                     restrictions.push_back((*arg1, *arg2));
                     restrictions.push_back((*body1, *body2));
@@ -308,10 +335,18 @@ impl<'a> Typer<'a> {
                         }
                     }
                 }
-                _ => Err(TypeError::DifferentType("".to_string())),
+                _ => Err(TypeError::DifferentType(format!("{:?}, {:?}", ty1, ty2))),
             },
         }
     }
+}
+
+fn vec_to_tuples<T: Clone>(vector: &Vec<T>) -> Vec<(T, T)> {
+    let mut tuples_vec = Vec::new();
+    for i in 0..vector.len() - 1 {
+        tuples_vec.push((vector[i].clone(), vector[i + 1].clone()));
+    }
+    tuples_vec
 }
 
 #[cfg(test)]

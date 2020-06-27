@@ -1,6 +1,6 @@
 use crate::eval::{Env, EvalError, ExprVal};
 use crate::parser::{BinOpKind, Expr};
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 
 pub fn eval(vec_ast: &[Expr]) -> Result<Vec<ExprVal>, EvalError> {
     let mut result = vec![];
@@ -20,13 +20,11 @@ fn eval_expression(ast: &Expr, environment: &mut Env) -> Result<ExprVal, EvalErr
         },
         &Expr::I64(n) => Ok(ExprVal::I64(*n)),
         &Expr::Bool(b) => Ok(ExprVal::Bool(*b)),
-        &Expr::Nil | &Expr::Cons(_, _) => unimplemented!(),
-        &Expr::Array(array) => {
-            let mut evaled_array = VecDeque::new();
-            for element in array {
-                evaled_array.push_back(eval_expression(element, environment)?);
-            }
-            Ok(ExprVal::Array(evaled_array))
+        &Expr::Nil => Ok(ExprVal::Nil),
+        &Expr::Cons(head, tail) => {
+            let head = eval_expression(head, environment)?;
+            let tail = eval_expression(tail, environment)?;
+            Ok(ExprVal::Cons(Box::new(head), Box::new(tail)))
         }
         &Expr::BinOp(op, lhs, rhs) => {
             let lhs = eval_expression(lhs, environment)?;
@@ -38,7 +36,7 @@ fn eval_expression(ast: &Expr, environment: &mut Env) -> Result<ExprVal, EvalErr
             environment.insert(var.clone(), init);
             eval_expression(body, environment)
         }
-        &Expr::LetRec(var, arg, init, body) => {
+        &Expr::LetRec(var, _arg, init, body) => {
             let init = match eval_expression(init, environment) {
                 Ok(ExprVal::Closure(arg, body, env)) => {
                     ExprVal::ClosureRec(var.clone(), arg, body, env)
@@ -61,11 +59,16 @@ fn eval_expression(ast: &Expr, environment: &mut Env) -> Result<ExprVal, EvalErr
         }
         &Expr::Match(condition, patterns) => {
             let condition = eval_expression(condition, environment)?;
-            match condition {
-                ExprVal::Array(mut array) => {
-                    match_pattern_array(&mut array, patterns.clone(), environment)
+            let mut patterns = patterns.iter();
+            loop {
+                match patterns.next() {
+                    Some((pattern, arm)) => {
+                        if is_match(&condition, pattern, environment)? {
+                            break eval_expression(arm, environment);
+                        }
+                    }
+                    None => break Err(EvalError::PatternsNotExhaustive),
                 }
-                _ => unimplemented!(),
             }
         }
         &Expr::Fun(arg, body) => Ok(ExprVal::Closure(
@@ -105,32 +108,29 @@ fn apply_operator(op: BinOpKind, lhs: ExprVal, rhs: ExprVal) -> Result<ExprVal, 
     }
 }
 
-/// Find a matching pattern for an array and execute its match arm.
-fn match_pattern_array(
-    array: &mut VecDeque<ExprVal>,
-    patterns: Vec<(Expr, Expr)>,
-    environment: &mut Env,
-) -> Result<ExprVal, EvalError> {
-    let mut patterns = patterns.iter();
-    loop {
-        match patterns.next() {
-            Some((pattern, arm)) => match pattern.clone() {
-                Expr::Nil if array.len() == 0 => break eval_expression(arm, environment),
-                Expr::Cons(head, tail) => {
-                    match (*head, *tail) {
-                        (Expr::Var(head), Expr::Var(tail)) => {
-                            environment.insert(head, array.pop_front().unwrap());
-                            environment.insert(tail, ExprVal::Array(array.clone()));
-                            break eval_expression(arm, environment);
-                        }
-                        _ => unimplemented!(),
-                    }
-                }
-                _ => continue,
-            },
-            None => break Err(EvalError::PatternsNotExhaustive),
-        }
-    }
+fn is_match(condition: &ExprVal, pattern: &Expr, environment: &mut Env) -> Result<bool, EvalError> {
+    let result = match pattern {
+        Expr::Var(var) => match condition {
+            ExprVal::I64(_) | ExprVal::Bool(_) | ExprVal::Nil | ExprVal::Cons(_, _) => {
+                environment.insert(var.clone(), condition.clone());
+                true
+            }
+            _ => false,
+        },
+        Expr::Nil => match condition {
+            ExprVal::Nil => true,
+            _ => false,
+        },
+        Expr::Cons(pattern_head, pattern_tail) => match condition {
+            ExprVal::Cons(head, tail) => {
+                is_match(head, pattern_head, environment)?
+                    && is_match(tail, pattern_tail, environment)?
+            }
+            _ => false,
+        },
+        _ => unimplemented!(),
+    };
+    Ok(result)
 }
 
 #[cfg(test)]

@@ -1,7 +1,6 @@
 use crate::lexer::Token;
 use crate::parser::ParseError;
 use crate::parser::{BinOpKind, Expr};
-use std::collections::VecDeque;
 
 ///Specify caller of `Parser::parse_multi_args_fun`.
 #[derive(Clone, Debug, PartialEq)]
@@ -162,12 +161,8 @@ impl<'a> Parser<'a> {
 
         while self.consume(Token::VerticalBar)? {
             let pattern = match self.peek() {
-                Some(Token::LBracket) => {
-                    self.parse_primary()?
-                }
-                Some(Token::Identifier(_)) => {
-                    self.parse_cons()?
-                }
+                Some(Token::LBracket) => self.parse_primary()?,
+                Some(Token::Identifier(_)) => self.parse_cons()?,
                 _ => return Err(ParseError::UnexpectedToken),
             };
             self.expect_token(Token::RArrow)?;
@@ -217,16 +212,16 @@ impl<'a> Parser<'a> {
     /// BNF:
     /// COMP ::= CONS ((`<` CONS) | (`>` CONS))?
     fn parse_compare(&mut self) -> Result<Expr, ParseError> {
-        let lhs = self.parse_add()?;
+        let lhs = self.parse_cons()?;
         match self.peek() {
             Some(&Token::Lt) => {
                 self.next();
-                let rhs = self.parse_add()?;
+                let rhs = self.parse_cons()?;
                 Ok(Expr::BinOp(BinOpKind::Lt, Box::new(lhs), Box::new(rhs)))
             }
             Some(&Token::Gt) => {
                 self.next();
-                let rhs = self.parse_add()?;
+                let rhs = self.parse_cons()?;
                 Ok(Expr::BinOp(BinOpKind::Gt, Box::new(lhs), Box::new(rhs)))
             }
             _ => Ok(lhs),
@@ -236,10 +231,15 @@ impl<'a> Parser<'a> {
     /// BNF:
     /// CONS ::= ADD (`::` CONS)?
     fn parse_cons(&mut self) -> Result<Expr, ParseError> {
-        let lhs = self.parse_mul()?;
-        self.expect_token(Token::Cons)?;
-        let rhs = self.parse_mul()?;
-        Ok(Expr::Cons(Box::new(lhs), Box::new(rhs)))
+        let lhs = self.parse_add()?;
+        match self.peek() {
+            Some(&Token::Cons) => {
+                self.expect_token(Token::Cons)?;
+                let rhs = self.parse_cons()?;
+                Ok(Expr::Cons(Box::new(lhs), Box::new(rhs)))
+            }
+            _ => Ok(lhs),
+        }
     }
 
     /// BNF:
@@ -317,18 +317,21 @@ impl<'a> Parser<'a> {
                     }
                 }
                 Token::LBracket => {
-                    if self.consume(Token::RBracket)? {
-                        return Ok(Expr::Nil);
-                    }
-                    let mut expr_array = VecDeque::new();
-                    while !self.consume(Token::RBracket)? {
-                        let element = self.parse_expr()?;
-                        expr_array.push_back(element);
-                        self.consume(Token::Semicolon)?;
-                    }
-                    Ok(Expr::Array(expr_array))
+                    let expr_list = self.parse_list()?;
+                    Ok(expr_list)
                 }
                 _ => Err(ParseError::NonTerminalSymbol),
             })
+    }
+
+    fn parse_list(&mut self) -> Result<Expr, ParseError> {
+        if self.consume(Token::RBracket)? {
+            Ok(Expr::Nil)
+        } else {
+            let element = self.parse_expr()?;
+            self.expect_token(Token::Semicolon)?;
+            let remain_list = self.parse_list()?;
+            Ok(Expr::Cons(Box::new(element), Box::new(remain_list)))
+        }
     }
 }

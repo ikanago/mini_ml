@@ -6,6 +6,7 @@ use crate::eval::eval::eval;
 use crate::eval::ExprVal;
 use crate::lexer::lexer::Lexer;
 use crate::parser::parser::Parser;
+use crate::parser::typing::Typer;
 
 /// Interpret source code.
 /// If `dump_token` is true, dump lexed tokens, so do `dump_ast`.
@@ -33,6 +34,9 @@ pub fn interpret(source_code: &str, dump_token: bool, dump_ast: bool) -> Vec<Exp
     if dump_ast {
         eprintln!("{:?}", vec_ast);
     }
+
+    let mut typer = Typer::new(&vec_ast);
+    typer.infer_type().unwrap();
 
     match eval(&vec_ast) {
         Ok(result) => result,
