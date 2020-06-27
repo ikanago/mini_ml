@@ -1,5 +1,5 @@
 use crate::eval::{Env, EvalError, ExprVal};
-use crate::parser::{BinOpKind, Expr, Pattern};
+use crate::parser::{BinOpKind, Expr};
 use std::collections::{HashMap, VecDeque};
 
 pub fn eval(vec_ast: &[Expr]) -> Result<Vec<ExprVal>, EvalError> {
@@ -20,6 +20,7 @@ fn eval_expression(ast: &Expr, environment: &mut Env) -> Result<ExprVal, EvalErr
         },
         &Expr::I64(n) => Ok(ExprVal::I64(*n)),
         &Expr::Bool(b) => Ok(ExprVal::Bool(*b)),
+        &Expr::Nil | &Expr::Cons(_, _) => unimplemented!(),
         &Expr::Array(array) => {
             let mut evaled_array = VecDeque::new();
             for element in array {
@@ -107,18 +108,23 @@ fn apply_operator(op: BinOpKind, lhs: ExprVal, rhs: ExprVal) -> Result<ExprVal, 
 /// Find a matching pattern for an array and execute its match arm.
 fn match_pattern_array(
     array: &mut VecDeque<ExprVal>,
-    patterns: Vec<(Pattern, Expr)>,
+    patterns: Vec<(Expr, Expr)>,
     environment: &mut Env,
 ) -> Result<ExprVal, EvalError> {
     let mut patterns = patterns.iter();
     loop {
         match patterns.next() {
             Some((pattern, arm)) => match pattern.clone() {
-                Pattern::Nil if array.len() == 0 => break eval_expression(arm, environment),
-                Pattern::Cons(head, tail) => {
-                    environment.insert(head, array.pop_front().unwrap());
-                    environment.insert(tail, ExprVal::Array(array.clone()));
-                    break eval_expression(arm, environment);
+                Expr::Nil if array.len() == 0 => break eval_expression(arm, environment),
+                Expr::Cons(head, tail) => {
+                    match (*head, *tail) {
+                        (Expr::Var(head), Expr::Var(tail)) => {
+                            environment.insert(head, array.pop_front().unwrap());
+                            environment.insert(tail, ExprVal::Array(array.clone()));
+                            break eval_expression(arm, environment);
+                        }
+                        _ => unimplemented!(),
+                    }
                 }
                 _ => continue,
             },

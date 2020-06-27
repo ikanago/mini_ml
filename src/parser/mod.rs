@@ -2,6 +2,7 @@ pub mod parser;
 pub mod typing;
 
 use std::collections::{HashSet, VecDeque};
+use std::convert::From;
 
 // Type substitution rules of type variable.
 pub type Substitutions = Vec<(usize, Type)>;
@@ -20,12 +21,14 @@ pub enum Expr {
     Var(String),
     I64(i64),
     Bool(bool),
+    Nil,
+    Cons(Box<Expr>, Box<Expr>),
     Array(VecDeque<Expr>),
     BinOp(BinOpKind, Box<Expr>, Box<Expr>),
     Let(String, Box<Expr>, Box<Expr>),
     LetRec(String, String, Box<Expr>, Box<Expr>),
     If(Box<Expr>, Box<Expr>, Box<Expr>),
-    Match(Box<Expr>, Vec<(Pattern, Expr)>),
+    Match(Box<Expr>, Vec<(Expr, Expr)>),
     Fun(String, Box<Expr>),
     Apply(Box<Expr>, Box<Expr>),
 }
@@ -35,6 +38,22 @@ pub enum Pattern {
     Nil,
     Cons(String, String),
     Var(String),
+}
+
+impl From<Expr> for Pattern {
+    fn from(expr: Expr) -> Self {
+        match expr {
+            Expr::Nil => Pattern::Nil,
+            Expr::Cons(lhs, rhs) => {
+                match (*lhs, *rhs) {
+                    (Expr::Var(lhs), Expr::Var(rhs)) => Pattern::Cons(lhs, rhs),
+                    _ => unimplemented!(),
+                }
+            }
+            Expr::Var(var) => Pattern::Var(var),
+            _ => unimplemented!(),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -49,6 +68,7 @@ pub enum ParseError {
 pub enum Type {
     TyI64,
     TyBool,
+    TyArray(Box<Type>),
     TyVar(usize),
     TyFun(Box<Type>, Box<Type>),
 }
@@ -60,6 +80,7 @@ impl Type {
             match &ty {
                 &Type::TyI64 => (),
                 &Type::TyBool => (),
+                &Type::TyArray(ty) => inner(ty, free_type_vars),
                 &Type::TyVar(n) => {
                     free_type_vars.insert(*n);
                 }
@@ -79,6 +100,10 @@ impl Type {
         match &self {
             &Type::TyI64 => Type::TyI64,
             &Type::TyBool => Type::TyBool,
+            &Type::TyArray(ty) => {
+                let ty = ty.substitute_type(substitutions);
+                Type::TyArray(Box::new(ty))
+            }
             &Type::TyVar(n) => {
                 substitutions
                     .iter()

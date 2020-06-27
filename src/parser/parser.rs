@@ -1,6 +1,6 @@
 use crate::lexer::Token;
 use crate::parser::ParseError;
-use crate::parser::{BinOpKind, Expr, Pattern};
+use crate::parser::{BinOpKind, Expr};
 use std::collections::VecDeque;
 
 ///Specify caller of `Parser::parse_multi_args_fun`.
@@ -161,19 +161,12 @@ impl<'a> Parser<'a> {
         let mut clauses = Vec::new();
 
         while self.consume(Token::VerticalBar)? {
-            let pattern = match self.next() {
+            let pattern = match self.peek() {
                 Some(Token::LBracket) => {
-                    self.expect_token(Token::RBracket)?;
-                    Pattern::Nil
+                    self.parse_primary()?
                 }
-                Some(Token::Identifier(head)) => {
-                    let head = head.clone();
-                    self.expect_token(Token::Cons)?;
-                    let tail = match self.next() {
-                        Some(Token::Identifier(tail)) => tail,
-                        _ => return Err(ParseError::UnexpectedToken),
-                    };
-                    Pattern::Cons(head, tail.clone())
+                Some(Token::Identifier(_)) => {
+                    self.parse_cons()?
                 }
                 _ => return Err(ParseError::UnexpectedToken),
             };
@@ -222,7 +215,7 @@ impl<'a> Parser<'a> {
     }
 
     /// BNF:
-    /// COMP ::= ADD ((`<` ADD) | (`>` ADD))?
+    /// COMP ::= CONS ((`<` CONS) | (`>` CONS))?
     fn parse_compare(&mut self) -> Result<Expr, ParseError> {
         let lhs = self.parse_add()?;
         match self.peek() {
@@ -238,6 +231,15 @@ impl<'a> Parser<'a> {
             }
             _ => Ok(lhs),
         }
+    }
+
+    /// BNF:
+    /// CONS ::= ADD (`::` CONS)?
+    fn parse_cons(&mut self) -> Result<Expr, ParseError> {
+        let lhs = self.parse_mul()?;
+        self.expect_token(Token::Cons)?;
+        let rhs = self.parse_mul()?;
+        Ok(Expr::Cons(Box::new(lhs), Box::new(rhs)))
     }
 
     /// BNF:
@@ -315,6 +317,9 @@ impl<'a> Parser<'a> {
                     }
                 }
                 Token::LBracket => {
+                    if self.consume(Token::RBracket)? {
+                        return Ok(Expr::Nil);
+                    }
                     let mut expr_array = VecDeque::new();
                     while !self.consume(Token::RBracket)? {
                         let element = self.parse_expr()?;
